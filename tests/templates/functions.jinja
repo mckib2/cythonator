@@ -1,0 +1,32 @@
+// Overload sets
+//     - Alternate between named and unnamed arguments
+//     - Naming convention is reverse the tag-safe type label
+{% for tipe in TYPES -%}
+{% for argtype in ARGTYPES -%}
+{{ tipe.name }} {{ tipe.tag_safe }}_function_overloads({{ argtype.name }}*{% if loop.index % 2 %} {{ argtype.tag_safe[::-1] }}{% endif %});
+{% endfor -%}
+{% endfor %}
+
+// Individual functions
+{% for tipe in TYPES -%}
+{% for argtype in ARGTYPES -%}
+{{ tipe.name }} {{ tipe.tag_safe }}_function_{{ argtype.tag_safe }}({{ argtype.name }});
+{% endfor -%}
+{% endfor %}
+
+// const/static versions
+{% for prefix_const in ['', 'const'] -%}
+{% for tipe in TYPES -%}
+static {{ prefix_const + ' ' if prefix_const != '' }}{{ tipe.name }}* {{ tipe.tag_safe }}_function_{{ prefix_const + '_' if prefix_const != '' }}static();
+{% endfor -%}
+{% endfor %}
+
+// Templated functions
+{% for tipe in TYPES -%}
+template<class T> {{ tipe.name }} {{ tipe.tag_safe }}_function_templated(T t);
+{% endfor %}
+
+// Template specializations of above
+{% for tipe in TYPES -%}
+template<> {{ tipe.name }} {{ tipe.tag_safe }}_function_templated({{ tipe.name }}* t);
+{% endfor %}

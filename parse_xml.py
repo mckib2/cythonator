@@ -1,28 +1,35 @@
+'''Parse Doxygen output into Python objects.'''
 
 from html.parser import HTMLParser
 import re
 from lxml import etree as ET
 
+
 class Typedef:
+    '''C++ typedef statement.'''
     def __init__(self, xml):
         assert xml.get('kind') == 'typedef'
 
+        self.name = None
+        self.type = None
         for e in xml.iterchildren():
             if e.tag in set(['type', 'definition', 'argsstring', 'name']):
                 setattr(self, e.tag, e.text)
 
     def __repr__(self):
         out = '%s[%s = %s]' % (self.__class__.__name__, self.name, self.type)
-        #for thing in set(vars(self)) - set(['name']):
-        #    out += '  %s: %s\n' % (thing, getattr(self, thing))
+        # for thing in set(vars(self)) - set(['name']):
+        #     out += '  %s: %s\n' % (thing, getattr(self, thing))
         return out
 
+
 class Param:
+    '''Arguments in a C/C++ function signature.'''
     def __init__(self, xml):
         assert xml.tag == 'param'
 
         tipe = list(xml.iterfind('type'))[0]
-        if len(list(tipe.iterchildren())):
+        if list(tipe.iterchildren()):
             # If it has children, it's a refTextType
             h = HTMLParser()
             tipe = h.unescape(ET.tostring(tipe).decode())
@@ -34,7 +41,7 @@ class Param:
             tipe = tipe.text
 
         name = list(xml.iterfind('declname'))
-        if len(name):
+        if name:
             self.name = name[0].text
         else:
             self.name = None
@@ -52,7 +59,9 @@ class Param:
             out += '  %s: %s\n' % (thing, getattr(self, thing))
         return out
 
+
 class Funktion:
+    '''C/C++ function.'''
     def __init__(self, xml):
         assert xml.get('kind') == 'function'
 
@@ -65,6 +74,8 @@ class Funktion:
         self.const = self.const != 'no'
         self.virt = self.virt != 'non-virtual'
 
+        self.type = None
+        self.name = None
         for e in xml.iterchildren():
             if e.tag in set(['templateparamlist', 'type', 'definition', 'argsstring', 'name', 'param']):
                 if e.tag == 'param':
@@ -108,6 +119,7 @@ class Funktion:
 
 
 class Klass:
+    '''C++ Class.'''
     def __init__(self, xml):
         assert xml.get('kind') == 'class'
 
@@ -131,7 +143,6 @@ class Klass:
                 else:
                     print(e.get('kind'))
 
-
     def __repr__(self):
         out = '%s[%s]:\n' % (self.__class__.__name__, self.name)
         out += '  functions[%d]:\n' % len(self.functions)
@@ -148,6 +159,7 @@ class Klass:
 
 
 def parse(filename='xml/all.xml'):
+    '''Doxygen XML output to Python object representation.'''
     tree = ET.parse(filename)
 
     klasses = []
@@ -157,8 +169,16 @@ def parse(filename='xml/all.xml'):
     for e in tree.getroot():
         # First level should be compounddef
 
+        if e.get('kind') == 'file':
+            for ee in e.iterchildren():
+                if ee.get('kind') == 'func':
+                    for eee in ee.iterchildren():
+                        functions.append(Funktion(eee))
+        
         if e.get('kind') == 'class':
             klasses.append(Klass(e))
+        elif e.get('kind') == 'function':
+            functions.append(Funktion(e))
         elif e.get('kind') == 'namespace':
             for ee in e.iterchildren():
                 if ee.tag == 'sectiondef':
@@ -170,7 +190,8 @@ def parse(filename='xml/all.xml'):
                         else:
                             raise NotImplementedError('Found something new in namespace')
         else:
-            print(list(e.iterchildren())[0].text)
+            # print(list(e.iterchildren())[0].text)
+            pass
 
     for t in typedefs:
         print(t)
@@ -179,7 +200,8 @@ def parse(filename='xml/all.xml'):
     for k in klasses:
         print(k)
 
-    #print(functions[8])
+    # print(functions[8])
+
 
 if __name__ == '__main__':
     parse()
