@@ -4,6 +4,7 @@ import subprocess
 import pathlib
 import json
 from collections import namedtuple
+import argparse
 
 # from parse_xml import parse
 
@@ -165,12 +166,17 @@ def cythonator(files: list, clang_exe='clang++-10'):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='C++ -> Cython.')
+    parser.add_argument(
+        '--header', type=str, help='C++ header file', required=True)
+    args = parser.parse_args()
 
-    infiles = [
-        # 'tests/void_function_no_args.hpp',
-        # 'tests/typed_function_no_args.hpp',
-        # 'tests/headers/functions.hpp',
-        'tests/headers/simple.hpp',
-    ]
+    # infiles = [
+    #     # 'tests/void_function_no_args.hpp',
+    #     # 'tests/typed_function_no_args.hpp',
+    #     # 'tests/headers/functions.hpp',
+    #     'tests/headers/simple.hpp',
+    # ]
+    # cythonator([str(pathlib.Path(f).resolve()) for f in infiles])
 
-    cythonator([str(pathlib.Path(f).resolve()) for f in infiles])
+    cythonator([args.header])
