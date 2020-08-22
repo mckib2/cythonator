@@ -1,4 +1,4 @@
-'''Compile clang tools needed '''
+'''Compile the clang tools we need.'''
 
 import pathlib
 import platform
@@ -122,6 +122,9 @@ clangAST_include = [
     pathlib.Path(LLVM_DIR) / 'include',
 ]
 
+# ASTMatchers next...
+# Got to get clangParser it looks like...
+
 
 setup(
     name='cythonator',
@@ -163,7 +166,8 @@ setup(
         Extension(
             'clangAST',
             sources=clangBasic_sources + clangLex_sources + clangAST_sources,
-            include_dirs=list(set(clangBasic_include + clangLex_include + clangAST_include)),
+            include_dirs=list(set(
+                clangBasic_include + clangLex_include + clangAST_include)),
             language='c++',
         )
     ],

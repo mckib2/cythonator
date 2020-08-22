@@ -1,12 +1,11 @@
 '''Transpile C/C++ headers into Cython extensions.'''
 
 import subprocess
-import pathlib
 import json
 from collections import namedtuple
 import argparse
 
-# from parse_xml import parse
+from cythonator.write_cython import write_pxd
 
 Type = namedtuple('Type', 'name is_ref is_ptr is_const')
 Typedef = namedtuple('Typedef', 'id name type referenced')
@@ -15,7 +14,7 @@ Param = namedtuple('Param', 'id name type')
 Function = namedtuple(
     'Function',
     'id name previously_declared return_type params templateparams')
-Namespace = namedtuple('Namespace', 'id name functions')
+Namespace = namedtuple('Namespace', 'id name functions typedefs namespaces')
 
 
 def _is_const(type_str):
@@ -117,16 +116,18 @@ def handle_namespace(node):
     return Namespace(
         id=node['id'],
         name=node['name'],
-        functions=[handle_function(f) for f in node['inner'] if f['kind'] in {'FunctionDecl', 'FunctionTemplateDecl'}]
+        functions=[handle_function(f) for f in node['inner'] if f['kind'] in {'FunctionDecl', 'FunctionTemplateDecl'}],
+        typedefs=[handle_typedef(t) for t in node['inner'] if t['kind'] == 'TypedefDecl'],
+        namespaces=[handle_namespace(n) for n in node['inner'] if n['kind'] == 'NamespaceDecl'],
     )
 
 
-def cythonator(files: list, clang_exe='clang++-10'):
+def cythonator(filename: str, clang_exe='clang++-10'):
     '''C/C++ -> Cython.'''
 
     # Process the sources
     proc = subprocess.Popen(
-        [clang_exe, '-Xclang', '-ast-dump=json', '-fsyntax-only'] + files,
+        [clang_exe, '-Xclang', '-ast-dump=json', '-fsyntax-only'] + [filename],
         stdout=subprocess.PIPE)
     out, _err = proc.communicate()
 
@@ -138,31 +139,32 @@ def cythonator(files: list, clang_exe='clang++-10'):
     # print(list(ast['inner'][-1].keys()))
     # print(ast['inner'][-1]['inner'])
 
-    typedefs = []
-    functions = []
-    namespaces = []
+    global_namespace = Namespace(
+        id='_global_namespace',
+        name='',
+        functions=[],
+        typedefs=[],
+        namespaces=[],
+    )
     for node in ast['inner']:
         if node['kind'] in {'FunctionDecl', 'FunctionTemplateDecl'}:
-            functions.append(handle_function(node))
+            global_namespace.functions.append(handle_function(node))
         elif node['kind'] == 'NamespaceDecl':
-            namespaces.append(handle_namespace(node))
+            global_namespace.namespaces.append(handle_namespace(node))
         elif node['kind'] == 'TypedefDecl':
             # ignore double underscored typedefs
             if node['name'].startswith('__'):
                 continue
-            typedefs.append(handle_typedef(node))
+            global_namespace.typedefs.append(handle_typedef(node))
         elif node['kind'] == 'CXXRecordDecl':
             # both structs and classes
-            print(node)
+            # print(node)
+            print('classes not handled yet')
         else:
             print(node['kind'])
 
-    for f in functions:
-        print(f)
-    for n in namespaces:
-        print(n)
-    for t in typedefs:
-        print(t)
+    # print(global_namespace)
+    write_pxd(global_namespace, filename)
 
 
 if __name__ == '__main__':
@@ -179,4 +181,4 @@ if __name__ == '__main__':
     # ]
     # cythonator([str(pathlib.Path(f).resolve()) for f in infiles])
 
-    cythonator([args.header])
+    cythonator(args.header)
