@@ -5,7 +5,7 @@ import json
 from collections import namedtuple
 import argparse
 import re
-import logging
+from warnings import warn
 
 from cythonator.write_cython import write_pxd
 
@@ -69,7 +69,7 @@ def handle_function(node):
         # TODO: doesn't handle nested templates yet
         templateparams = [TemplateParam(
             id=t['id'],
-            name=t['name'],
+            name=t['name'] if 'name' in t else None,
             referenced='isReferenced' in t and t['isReferenced'],
             tag_used=t['tagUsed'],
             default=Type(
@@ -87,7 +87,7 @@ def handle_function(node):
             for t in node['inner']
             if t['kind'] == 'NonTypeTemplateParmDecl']
         if nonTypeTemplateParams:
-            logging.warning(
+            warn(
                 f'Non-type template parameters {set(nonTypeTemplateParams)} of'
                 f' the function "{node["name"]}" are not supported by Cython '
                 'and will be omitted from the template parameter list!')
@@ -166,7 +166,7 @@ def handle_class(node):
     order it comes in with respect to the last access specifier.
     '''
 
-    # if node['name'] == 'MyStructI':
+    # if node['name'] == 'NestedTemplateClass':
     #     print(json.dumps(node, indent=4))
 
     # Keep a list of all the base classes we inherit from;
@@ -179,12 +179,13 @@ def handle_class(node):
     # If it's a templated class, handle that first
     templateparams = ()
     nonTypeTemplateParams = ()
+    templateTemplateParams = ()
     if node['kind'] == 'ClassTemplateDecl':
         # handle TemplateParams here
         # TODO: doesn't handle nested templates yet
         templateparams = [TemplateParam(
             id=t['id'],
-            name=t['name'],
+            name=t['name'] if 'name' in t else None,
             referenced='isReferenced' in t and t['isReferenced'],
             tag_used=t['tagUsed'],
             default=Type(
@@ -203,6 +204,10 @@ def handle_class(node):
             for t in node['inner']
             if t['kind'] == 'NonTypeTemplateParmDecl']
 
+        templateTemplateParams = [
+            t['name'] for t in node['inner'] if t['kind'] =='TemplateTemplateParmDecl'
+        ]
+
         # FunctionTemplateDecl contains CXXRecordDecl
         node = [l for l in node['inner'] if l['kind'] == 'CXXRecordDecl'][0]
 
@@ -213,17 +218,24 @@ def handle_class(node):
     # Warn about Cython's lack of support for virtual functions
     virt_funcs = [n['name'] for n in node['inner'] if 'virtual' in n]
     if virt_funcs:
-        logging.warning(f'Cython does not support virtual interfaces '
-                        f'for functions {set(virt_funcs)} in class '
-                        f'"{node["name"]}"!')
+        warn(
+            f'Cython does not support virtual interfaces '
+            f'for functions {set(virt_funcs)} in '
+            f'{node["tagUsed"]} "{node["name"]}"!')
 
     # Warn about any non-type template params we encountered
     if nonTypeTemplateParams:
-        # print(json.dumps(node, indent=4))
-        logging.warning(
+        warn(
             f'Non-type template parameters {set(nonTypeTemplateParams)} of'
             f' the {node["tagUsed"]} "{node["name"]}" are not supported by Cython '
             'and will be omitted from the template parameter list!')
+
+    # Warn about any template-template paramters we encountered
+    if templateTemplateParams:
+        warn(
+            'Template-template parameters are not supported. Template-'
+            f'template parameters {set(templateTemplateParams)} '
+            f'of {node["tagUsed"]} "{node["name"]}" will be ignored.')
 
     # Deduce the access specifier of each entry in node['inner']
     current_access = 'private' if node['tagUsed'] == 'class' else 'public'

@@ -1,6 +1,8 @@
 '''Tests on classes/structs.'''
 
 import unittest
+import logging
+logging.captureWarnings(True) # suppress warnings while testing
 
 from .utils import _code_runner, _code_run_single_class
 
@@ -78,12 +80,13 @@ class TestStructs(unittest.TestCase):
         self.assertEqual(c.bases[0], 'ns::Base')
 
     def test_removal_of_implicit_functions_from_virtual(self):
-        s = _code_run_single_class('\n'.join([
-            f'{self.tagName} VirtTest {{',
-            'public:'*self.is_class,
-            '    virtual int myVirtMethod() { return 0; }',
-            '};',
-            ]))
+        with self.assertWarns(UserWarning):
+            s = _code_run_single_class('\n'.join([
+                f'{self.tagName} VirtTest {{',
+                'public:'*self.is_class,
+                '    virtual int myVirtMethod() { return 0; }',
+                '};',
+                ]))
         # Make sure that implicitly generated methods from the virtual
         # function are not included
         self.assertEqual(len(s.methods), 1)
@@ -150,12 +153,14 @@ class TestStructs(unittest.TestCase):
         self.assertEqual(s.templateparams[0].tag_used, 'typename')
 
     def test_nontype_template(self):
-        code = '\n'.join([
-            'template<int N>',
-            f'{self.tagName} MyStruct {{',
-            '};',
-        ])
-        s = _code_run_single_class(code)
+        with self.assertWarns(UserWarning):
+            s = _code_run_single_class('\n'.join([
+                'template<int N>',
+                f'{self.tagName} MyStructI {{',
+                'public:'*self.is_class,
+                '    double myArray[N];',
+                '};',
+            ]))
         # Cython does not support nontype templates! Should be no params
         self.assertEqual(len(s.templateparams), 0)
 
@@ -177,10 +182,31 @@ class TestStructs(unittest.TestCase):
         self.assertFalse(s.templateparams[0].is_parameter_pack)
         self.assertTrue(s.templateparams[1].is_parameter_pack)
 
+    def test_unnamed_template_parameter_pack(self):
+        s = _code_run_single_class('\n'.join([
+            'template<class T, typename...>',
+            f'{self.tagName} MyStruct {{ }};',
+        ]))
+        self.assertFalse(s.templateparams[0].is_parameter_pack)
+        self.assertTrue(s.templateparams[1].is_parameter_pack)
+        self.assertEqual(s.templateparams[1].name, None)
+
     def test_nested_templates(self):
-        pass
+        with self.assertWarns(UserWarning):
+            s = _code_run_single_class('\n'.join([
+                'template <class SomeType, template <class> class OtherType>',
+                f'{self.tagName} NestedTemplateClass {{',
+                'public:'*self.is_class,
+                '    OtherType<SomeType> f;',
+                '};',
+            ]))
+        # template-template parameters are currently not supported
+        self.assertEqual(len(s.templateparams), 1)
 
     def test_templated_methods(self):
+        pass
+
+    def test_curiously_recurring_template_pattern(self):
         pass
 
     def test_typedef(self):
@@ -204,3 +230,7 @@ class TestClasses(TestStructs):
     def setUp(self):
         self.tagName = 'class'
         self.is_class = True
+
+
+if __name__ == '__main__':
+    unittest.main()

@@ -170,6 +170,15 @@ class TestFunctionsWithArgs(unittest.TestCase):
         self.assertFalse(f.templateparams[0].is_parameter_pack)
         self.assertTrue(f.templateparams[1].is_parameter_pack)
 
+    def test_unnamed_template_parameter_pack(self):
+        f = _code_run_single_fun('\n'.join([
+            'template<class T, typename...>',
+            'void tfun();',
+        ]))
+        self.assertFalse(f.templateparams[0].is_parameter_pack)
+        self.assertTrue(f.templateparams[1].is_parameter_pack)
+        self.assertEqual(f.templateparams[1].name, None)
+
 
 if __name__ == '__main__':
     unittest.main()
