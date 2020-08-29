@@ -112,12 +112,13 @@ class TestFunctionsWithArgs(unittest.TestCase):
             'long double',
         ]
 
-    # def test_named_c_main_types_single_arg(self):
-    #     for t in set(self.C_MAIN_TYPES) - {'void'}:
-    #         for u in self.C_MAIN_TYPES:
-    #             fun = _code_run_single_fun(f'{u} fun({t} arg);')
-    #             self.assertEqual(fun.params[0].name, 'arg')
-    #             self.assertEqual(fun.params[0].type.name, t)
+    @unittest.skip('Slow')
+    def test_named_c_main_types_single_arg(self):
+        for t in set(self.C_MAIN_TYPES) - {'void'}:
+            for u in self.C_MAIN_TYPES:
+                fun = _code_run_single_fun(f'{u} fun({t} arg);')
+                self.assertEqual(fun.params[0].name, 'arg')
+                self.assertEqual(fun.params[0].type.name, t)
 
     def test_unnamed_c_main_types_multi_args(self):
         num_args = 5
