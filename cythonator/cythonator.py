@@ -11,7 +11,7 @@ from cythonator.write_cython import write_pxd
 
 Type = namedtuple('Type', 'name is_ref is_ptr is_const is_const_ptr')
 Typedef = namedtuple('Typedef', 'id name type referenced')
-TemplateParam = namedtuple('TemplateParam', 'id name referenced tag_used')
+TemplateParam = namedtuple('TemplateParam', 'id name referenced tag_used default')
 Param = namedtuple('Param', 'id name type')
 Class = namedtuple(
         'Class',
@@ -175,6 +175,13 @@ def handle_class(node):
             name=t['name'],
             referenced='isReferenced' in t and t['isReferenced'],
             tag_used=t['tagUsed'],
+            default=Type(
+                name=_sanitize_type_str(t['defaultArg']['type']['qualType']),
+                is_ref='&' in t['defaultArg']['type']['qualType'],
+                is_ptr='*' in t['defaultArg']['type']['qualType'],
+                is_const=_is_const(t['defaultArg']['type']['qualType']),
+                is_const_ptr=_is_const_ptr(t['defaultArg']['type']['qualType']),
+            ) if 'defaultArg' in t else None,
         ) for t in node['inner'] if t['kind'] == 'TemplateTypeParmDecl']
 
         # TODO: move this code and the copy in handle_function to a separate shared function

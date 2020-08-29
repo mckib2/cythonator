@@ -159,6 +159,16 @@ class TestStructs(unittest.TestCase):
         # Cython does not support nontype templates! Should be no params
         self.assertEqual(len(s.templateparams), 0)
 
+    def test_default_template(self):
+        s = _code_run_single_class('\n'.join([
+            'template<class T, class U, class V = double&>',
+            f'{self.tagName} MyStructI {{ }};',
+        ]))
+        self.assertEqual(s.templateparams[0].default, None)
+        self.assertEqual(s.templateparams[1].default, None)
+        self.assertEqual(s.templateparams[2].default.name, 'double')
+        self.assertTrue(s.templateparams[2].default.is_ref)
+
     def test_ellipsis_template(self):
         pass
 
