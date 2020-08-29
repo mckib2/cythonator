@@ -11,10 +11,15 @@ Type = namedtuple('Type', 'name is_ref is_ptr is_const')
 Typedef = namedtuple('Typedef', 'id name type referenced')
 TemplateParam = namedtuple('TemplateParam', 'id name referenced tag_used')
 Param = namedtuple('Param', 'id name type')
+Class = namedtuple('Class', 'id name is_struct methods fields templateparams')
 Function = namedtuple(
     'Function',
     'id name previously_declared return_type params templateparams')
-Namespace = namedtuple('Namespace', 'id name functions typedefs namespaces')
+Method = namedtuple('Method', 'function is_ctor')
+Field = namedtuple('Field', 'id name type')
+Namespace = namedtuple(
+    'Namespace',
+    'id name functions typedefs namespaces classes')
 
 
 def _is_const(type_str):
@@ -61,8 +66,8 @@ def handle_function(node):
             tag_used=t['tagUsed'],
         ) for t in node['inner'] if t['kind'] == 'TemplateTypeParmDecl']
 
-        # FunctionTemplateDecl contains FunctionDecl
-        node = [l for l in node['inner'] if l['kind'] == 'FunctionDecl'][0]
+        # FunctionTemplateDecl contains FunctionDecl or CXXMethodDecl
+        node = [l for l in node['inner'] if l['kind'] in {'FunctionDecl', 'CXXMethodDecl'}][0]
 
     # Will this split always work?
     types = node['type']['qualType'].split('(')
@@ -119,7 +124,78 @@ def handle_namespace(node):
         functions=[handle_function(f) for f in node['inner'] if f['kind'] in {'FunctionDecl', 'FunctionTemplateDecl'}],
         typedefs=[handle_typedef(t) for t in node['inner'] if t['kind'] == 'TypedefDecl'],
         namespaces=[handle_namespace(n) for n in node['inner'] if n['kind'] == 'NamespaceDecl'],
+        classes=[handle_class(c) for c in node['inner'] if c['kind'] in {'CXXRecordDecl', 'ClassTemplateDecl'}],
     )
+
+
+def handle_class(node):
+    '''
+    Notes
+    -----
+    node['inner'] (if it exists) is in the same order as it is declared in the
+    header file.  This means access specifiers are given as entries in
+    node['inner'] and the [public|private|protected]-ness of the entry in
+    node['inner'] must be deduced by its tag ([class|struct]) as well as the
+    order it comes in with respect to the last access specifier.
+    '''
+
+    # If it's a templated class, handle that first
+    templateparams = ()
+    if node['kind'] == 'ClassTemplateDecl':
+        # handle TemplateParams here
+        # TODO: doesn't handle nested templates yet
+        templateparams = [TemplateParam(
+            id=t['id'],
+            name=t['name'],
+            referenced='isReferenced' in t and t['isReferenced'],
+            tag_used=t['tagUsed'],
+        ) for t in node['inner'] if t['kind'] == 'TemplateTypeParmDecl']
+
+        # FunctionTemplateDecl contains CXXRecordDecl
+        node = [l for l in node['inner'] if l['kind'] == 'CXXRecordDecl'][0]
+
+    # Deduce the access specifier of each entry in node['inner']
+    current_access = 'private' if node['tagUsed'] == 'class' else 'public'
+    for ii, thing in enumerate(node['inner']):
+        if thing['kind'] in {'CXXConstructorDecl', 'CXXMethodDecl', 'FunctionTemplateDecl', 'FieldDecl'}:
+            node['inner'][ii]['access'] = current_access
+        elif thing['kind'] == 'AccessSpecDecl':
+            current_access = thing['access']
+
+    return Class(
+        id=node['id'],
+        name=node['name'],
+        is_struct=node['tagUsed'] == 'struct',
+        # can add default ctor, movectr, copyctr, copyassign if wanted (look in definitionData)
+        methods=[Method(
+            function=handle_function(m),
+            is_ctor=m['kind'] == 'CXXConstructorDecl',
+        ) for m in node['inner'] if m['kind'] in {'CXXConstructorDecl', 'CXXMethodDecl', 'FunctionTemplateDecl'} and m['access'] == 'public'],
+        fields=[Field(
+            id=f['id'],
+            name=f['name'],
+            type=Type(
+                name=_sanitize_type_str(f['type']['qualType']),
+                is_ref='&' in f['type']['qualType'],
+                is_ptr='*' in f['type']['qualType'],
+                is_const=_is_const(f['type']['qualType']),
+            ),
+        ) for f in node['inner'] if f['kind'] == 'FieldDecl' and f['access'] == 'public'],
+        templateparams=templateparams,
+    )
+
+
+def _get_all_types(thing):
+    '''Find all types present in a "thing".'''
+
+    parsable = repr(thing)
+
+    # Find everything that looks like a type
+    types = set()
+    import re
+    for match in re.finditer(r"Type\(name='(?P<name>\w+)', is_ref=(?P<is_ref>\w+), is_ptr=(?P<is_ptr>\w+), is_const=(?P<is_const>\w+)\)", parsable):
+        types.add(match.group('name'))
+    return types
 
 
 def cythonator(filename: str, clang_exe='clang++-10'):
@@ -145,6 +221,7 @@ def cythonator(filename: str, clang_exe='clang++-10'):
         functions=[],
         typedefs=[],
         namespaces=[],
+        classes=[],
     )
     for node in ast['inner']:
         if node['kind'] in {'FunctionDecl', 'FunctionTemplateDecl'}:
@@ -156,15 +233,17 @@ def cythonator(filename: str, clang_exe='clang++-10'):
             if node['name'].startswith('__'):
                 continue
             global_namespace.typedefs.append(handle_typedef(node))
-        elif node['kind'] == 'CXXRecordDecl':
+        elif node['kind'] in {'CXXRecordDecl', 'ClassTemplateDecl'}:
             # both structs and classes
-            # print(node)
-            print('classes not handled yet')
+            # print(json.dumps(node, indent=4))
+            global_namespace.classes.append(handle_class(node))
+            # print(handle_class(node))
         else:
             print(node['kind'])
 
-    # print(global_namespace)
-    write_pxd(global_namespace, filename)
+    # print(global_namespace.classes)
+    # write_pxd(global_namespace, filename)
+    print(_get_all_types(global_namespace))
 
 
 if __name__ == '__main__':

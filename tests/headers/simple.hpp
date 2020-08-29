@@ -20,13 +20,28 @@ typedef myInt otherInt;
 typedef otherInt distantInt;
 
 struct myStruct {
+  myStruct() {}
+  void* method1(int& namedparam);
   int intField;
   double* dblField;
 };
 
 class myClass {
-private:
   int intField;
 public:
   double* dblField;
+  template<class T> myStruct* tfun(T& t);
 };
+
+template<typename U>
+class TemplatedClass {
+ public:
+  myClass* tfun(U* u);
+};
+
+namespace ns {
+  template<class V>
+  struct TemplatedStruct {
+    myStruct* tfun(V& v);
+  };
+}
