@@ -4,6 +4,7 @@ import subprocess
 import json
 from collections import namedtuple
 import argparse
+import re
 import logging
 
 from cythonator.write_cython import write_pxd
@@ -58,8 +59,8 @@ def handle_typedef(node):
         referenced='isReferenced' in node,
     )
 
-def handle_function(node):
 
+def handle_function(node):
     templateparams = ()
     if node['kind'] == 'FunctionTemplateDecl':
         print(node)
@@ -132,7 +133,6 @@ def handle_function(node):
 
 
 def handle_namespace(node):
-
     if 'inner' not in node:
         node['inner'] = []
 
@@ -248,7 +248,6 @@ def _get_all_types(thing):
 
     # Find everything that looks like a type
     types = set()
-    import re
     for match in re.finditer(r"Type\(name='(?P<name>\w+)', is_ref=(?P<is_ref>\w+), is_ptr=(?P<is_ptr>\w+), is_const=(?P<is_const>\w+)\)", parsable):
         types.add(match.group('name'))
     return types
