@@ -17,7 +17,7 @@ TemplateParam = namedtuple(
 Param = namedtuple('Param', 'id name type')
 Class = namedtuple(
         'Class',
-        'id name is_struct methods fields templateparams bases typedefs')
+        'id name is_struct methods fields templateparams bases typedefs classes')
 Function = namedtuple(
     'Function',
     'id name previously_declared return_type params templateparams')
@@ -166,7 +166,7 @@ def handle_class(node):
     order it comes in with respect to the last access specifier.
     '''
 
-    # if node['name'] == 'NestedTemplateClass':
+    # if node['name'] == 'MyStructI':
     #     print(json.dumps(node, indent=4))
 
     # Keep a list of all the base classes we inherit from;
@@ -270,6 +270,7 @@ def handle_class(node):
         templateparams=templateparams,
         bases=bases,
         typedefs=[handle_typedef(t) for t in node['inner'] if t['kind'] == 'TypedefDecl'],
+        classes=[handle_class(c) for c in node['inner'] if c['kind'] in {'CXXRecordDecl', 'ClassTemplateDecl'} and c['name'] != node['name']],
     )
 
 

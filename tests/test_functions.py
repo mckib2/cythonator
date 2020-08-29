@@ -86,7 +86,8 @@ class TestFunctionsNoArgs(unittest.TestCase):
         self.assertEqual(fun.templateparams[1].name, 'U')
 
     def test_non_type_template_param_void(self):
-        fun = _code_run_single_fun('template<unsigned int N> void fun();')
+        with self.assertWarns(UserWarning):
+            fun = _code_run_single_fun('template<unsigned int N> void fun();')
 
         # Currently non-type template parameters should be ignored:
         self.assertEqual(len(fun.templateparams), 0)

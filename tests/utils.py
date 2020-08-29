@@ -2,7 +2,10 @@ from tempfile import NamedTemporaryFile
 
 from cythonator import cythonator
 
+
 def _code_runner(code):
+    if isinstance(code, list):
+        code = '\n'.join(code)
     with NamedTemporaryFile(suffix='.hpp') as fp:
         fp.write(code.encode())
         fp.flush()
