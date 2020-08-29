@@ -152,6 +152,24 @@ class TestFunctionsWithArgs(unittest.TestCase):
             self.assertEqual(fun.return_type.is_const_ptr, mod == '*const')
             self.assertEqual(fun.return_type.is_const, const == 'const')
 
+    def test_default_template_param(self):
+        fun = _code_run_single_fun('\n'.join([
+            'template<class T, class U, class V = double&>',
+            'void tfun();',
+        ]))
+        self.assertEqual(fun.templateparams[0].default, None)
+        self.assertEqual(fun.templateparams[1].default, None)
+        self.assertEqual(fun.templateparams[2].default.name, 'double')
+        self.assertTrue(fun.templateparams[2].default.is_ref)
+
+    def test_template_parameter_pack(self):
+        f = _code_run_single_fun('\n'.join([
+            'template<class T, class ... Types>',
+            'void tfun();',
+        ]))
+        self.assertFalse(f.templateparams[0].is_parameter_pack)
+        self.assertTrue(f.templateparams[1].is_parameter_pack)
+
 
 if __name__ == '__main__':
     unittest.main()

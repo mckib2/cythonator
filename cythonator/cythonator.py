@@ -11,7 +11,9 @@ from cythonator.write_cython import write_pxd
 
 Type = namedtuple('Type', 'name is_ref is_ptr is_const is_const_ptr')
 Typedef = namedtuple('Typedef', 'id name type referenced')
-TemplateParam = namedtuple('TemplateParam', 'id name referenced tag_used default')
+TemplateParam = namedtuple(
+    'TemplateParam',
+    'id name referenced tag_used default is_parameter_pack')
 Param = namedtuple('Param', 'id name type')
 Class = namedtuple(
         'Class',
@@ -63,7 +65,6 @@ def handle_typedef(node):
 def handle_function(node):
     templateparams = ()
     if node['kind'] == 'FunctionTemplateDecl':
-        print(node)
         # handle TemplateParams here
         # TODO: doesn't handle nested templates yet
         templateparams = [TemplateParam(
@@ -71,6 +72,14 @@ def handle_function(node):
             name=t['name'],
             referenced='isReferenced' in t and t['isReferenced'],
             tag_used=t['tagUsed'],
+            default=Type(
+                name=_sanitize_type_str(t['defaultArg']['type']['qualType']),
+                is_ref='&' in t['defaultArg']['type']['qualType'],
+                is_ptr='*' in t['defaultArg']['type']['qualType'],
+                is_const=_is_const(t['defaultArg']['type']['qualType']),
+                is_const_ptr=_is_const_ptr(t['defaultArg']['type']['qualType']),
+            ) if 'defaultArg' in t else None,
+            is_parameter_pack='isParameterPack' in t and t['isParameterPack'],
         ) for t in node['inner'] if t['kind'] == 'TemplateTypeParmDecl']
 
         nonTypeTemplateParams = [
@@ -157,6 +166,9 @@ def handle_class(node):
     order it comes in with respect to the last access specifier.
     '''
 
+    # if node['name'] == 'MyStructI':
+    #     print(json.dumps(node, indent=4))
+
     # Keep a list of all the base classes we inherit from;
     # We currently don't keep track of access (public, private, etc.),
     # but that information is available here
@@ -182,6 +194,7 @@ def handle_class(node):
                 is_const=_is_const(t['defaultArg']['type']['qualType']),
                 is_const_ptr=_is_const_ptr(t['defaultArg']['type']['qualType']),
             ) if 'defaultArg' in t else None,
+            is_parameter_pack='isParameterPack' in t and t['isParameterPack'],
         ) for t in node['inner'] if t['kind'] == 'TemplateTypeParmDecl']
 
         # TODO: move this code and the copy in handle_function to a separate shared function

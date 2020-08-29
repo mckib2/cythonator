@@ -162,15 +162,20 @@ class TestStructs(unittest.TestCase):
     def test_default_template(self):
         s = _code_run_single_class('\n'.join([
             'template<class T, class U, class V = double&>',
-            f'{self.tagName} MyStructI {{ }};',
+            f'{self.tagName} MyStruct {{ }};',
         ]))
         self.assertEqual(s.templateparams[0].default, None)
         self.assertEqual(s.templateparams[1].default, None)
         self.assertEqual(s.templateparams[2].default.name, 'double')
         self.assertTrue(s.templateparams[2].default.is_ref)
 
-    def test_ellipsis_template(self):
-        pass
+    def test_template_parameter_pack(self):
+        s = _code_run_single_class('\n'.join([
+            'template<class T, class ... Types>',
+            f'{self.tagName} MyStruct {{ }};',
+        ]))
+        self.assertFalse(s.templateparams[0].is_parameter_pack)
+        self.assertTrue(s.templateparams[1].is_parameter_pack)
 
     def test_nested_templates(self):
         pass
