@@ -4,10 +4,11 @@ import subprocess
 import json
 from collections import namedtuple
 import argparse
+import logging
 
 from cythonator.write_cython import write_pxd
 
-Type = namedtuple('Type', 'name is_ref is_ptr is_const')
+Type = namedtuple('Type', 'name is_ref is_ptr is_const is_const_ptr')
 Typedef = namedtuple('Typedef', 'id name type referenced')
 TemplateParam = namedtuple('TemplateParam', 'id name referenced tag_used')
 Param = namedtuple('Param', 'id name type')
@@ -24,18 +25,19 @@ Namespace = namedtuple(
 
 def _is_const(type_str):
     type_str = type_str.strip()
-    cond1 = len(type_str) > len('const ') and type_str[:len('const ')+1] == 'const '
-    cond2 = len(type_str) > len(' const') and type_str[:-len(' const')] == ' const'
-    if cond1 or cond2:
+    if len(type_str) > len('const ') and type_str[:len('const ')] == 'const ':
         return True
     return False
 
 
+def _is_const_ptr(type_str):
+    type_str = type_str.strip().split()
+    return '*const' in type_str
+
+
 def _sanitize_type_str(type_str):
-    type_str = type_str.strip()
     type_str = type_str.replace('*', '').replace('&', '').strip()
-    if len(type_str) > len('const ') and 'const ' == type_str[:len('const ')]:
-        type_str = type_str[len('const '):].strip()
+    type_str = ' '.join([t for t in type_str.split() if t != 'const'])
     return type_str
 
 
@@ -49,6 +51,7 @@ def handle_typedef(node):
             is_ref='&' in node['type']['qualType'],
             is_ptr='*' in node['type']['qualType'],
             is_const=_is_const(node['type']['qualType']),
+            is_const_ptr=_is_const_ptr(node['type']['qualType']),
         ),
         referenced='isReferenced' in node,
     )
@@ -65,6 +68,16 @@ def handle_function(node):
             referenced='isReferenced' in t and t['isReferenced'],
             tag_used=t['tagUsed'],
         ) for t in node['inner'] if t['kind'] == 'TemplateTypeParmDecl']
+
+        nonTypeTemplateParams = [
+            t['type']['qualType'] + ' ' + t['name']
+            for t in node['inner']
+            if t['kind'] == 'NonTypeTemplateParmDecl']
+        if nonTypeTemplateParams:
+            logging.warning(
+                f'Non-type template parameters {set(nonTypeTemplateParams)} of'
+                f' the function "{node["name"]}" are not supported by Cython '
+                'and will be omitted from the template parameter list!')
 
         # FunctionTemplateDecl contains FunctionDecl or CXXMethodDecl
         node = [l for l in node['inner'] if l['kind'] in {'FunctionDecl', 'CXXMethodDecl'}][0]
@@ -87,6 +100,7 @@ def handle_function(node):
                     is_ref='&' in l['type']['qualType'],
                     is_ptr='*' in l['type']['qualType'],
                     is_const=_is_const(l['type']['qualType']),
+                    is_const_ptr=_is_const_ptr(l['type']['qualType']),
                 ),
             ) for l in node['inner'] if l['kind'] == 'ParmVarDecl']
 
@@ -107,6 +121,7 @@ def handle_function(node):
             is_ref='&' in ret_type,
             is_ptr='*' in ret_type,
             is_const=_is_const(ret_type),
+            is_const_ptr=_is_const_ptr(ret_type),
         ),
         params=params,
         templateparams=templateparams,
@@ -123,7 +138,7 @@ def handle_namespace(node):
         name=node['name'],
         functions=[handle_function(f) for f in node['inner'] if f['kind'] in {'FunctionDecl', 'FunctionTemplateDecl'}],
         typedefs=[handle_typedef(t) for t in node['inner'] if t['kind'] == 'TypedefDecl'],
-        namespaces=[handle_namespace(n) for n in node['inner'] if n['kind'] == 'NamespaceDecl'],
+        namespaces=[handle_namespace(n) for n in node['inner'] if n['kind'] == 'NamespaceDecl'] and 'name' in node,
         classes=[handle_class(c) for c in node['inner'] if c['kind'] in {'CXXRecordDecl', 'ClassTemplateDecl'}],
     )
 
@@ -179,6 +194,7 @@ def handle_class(node):
                 is_ref='&' in f['type']['qualType'],
                 is_ptr='*' in f['type']['qualType'],
                 is_const=_is_const(f['type']['qualType']),
+                is_const_ptr=_is_const_ptr(f['type']['qualType']),
             ),
         ) for f in node['inner'] if f['kind'] == 'FieldDecl' and f['access'] == 'public'],
         templateparams=templateparams,
@@ -225,8 +241,9 @@ def cythonator(filename: str, clang_exe='clang++-10'):
     )
     for node in ast['inner']:
         if node['kind'] in {'FunctionDecl', 'FunctionTemplateDecl'}:
+            # print(node)
             global_namespace.functions.append(handle_function(node))
-        elif node['kind'] == 'NamespaceDecl':
+        elif node['kind'] == 'NamespaceDecl' and 'name' in node: # ignore anonymous namespaces
             global_namespace.namespaces.append(handle_namespace(node))
         elif node['kind'] == 'TypedefDecl':
             # ignore double underscored typedefs
@@ -241,9 +258,10 @@ def cythonator(filename: str, clang_exe='clang++-10'):
         else:
             print(node['kind'])
 
-    # print(global_namespace.classes)
+    # print(global_namespace)
     # write_pxd(global_namespace, filename)
-    print(_get_all_types(global_namespace))
+    # print(_get_all_types(global_namespace))
+    return global_namespace
 
 
 if __name__ == '__main__':
