@@ -1161,34 +1161,6 @@ public:
   static bool classof(const Attr *A) { return A->getKind() == attr::ArmMveStrictPolymorphism; }
 };
 
-class ArmSveVectorBitsAttr : public TypeAttr {
-unsigned numBits;
-
-public:
-  // Factory methods
-  static ArmSveVectorBitsAttr *CreateImplicit(ASTContext &Ctx, unsigned NumBits, const AttributeCommonInfo &CommonInfo = {SourceRange{}});
-  static ArmSveVectorBitsAttr *Create(ASTContext &Ctx, unsigned NumBits, const AttributeCommonInfo &CommonInfo = {SourceRange{}});
-  static ArmSveVectorBitsAttr *CreateImplicit(ASTContext &Ctx, unsigned NumBits, SourceRange Range, AttributeCommonInfo::Syntax Syntax);
-  static ArmSveVectorBitsAttr *Create(ASTContext &Ctx, unsigned NumBits, SourceRange Range, AttributeCommonInfo::Syntax Syntax);
-
-  // Constructors
-  ArmSveVectorBitsAttr(ASTContext &Ctx, const AttributeCommonInfo &CommonInfo
-              , unsigned NumBits
-             );
-
-  ArmSveVectorBitsAttr *clone(ASTContext &C) const;
-  void printPretty(raw_ostream &OS,
-                   const PrintingPolicy &Policy) const;
-  const char *getSpelling() const;
-  unsigned getNumBits() const {
-    return numBits;
-  }
-
-
-
-  static bool classof(const Attr *A) { return A->getKind() == attr::ArmSveVectorBits; }
-};
-
 class ArtificialAttr : public InheritableAttr {
 public:
   enum Spelling {
@@ -6129,17 +6101,20 @@ public:
 private:
   DevTypeTy devType;
 
+unsigned level;
+
 public:
   // Factory methods
-  static OMPDeclareTargetDeclAttr *CreateImplicit(ASTContext &Ctx, MapTypeTy MapType, DevTypeTy DevType, const AttributeCommonInfo &CommonInfo = {SourceRange{}});
-  static OMPDeclareTargetDeclAttr *Create(ASTContext &Ctx, MapTypeTy MapType, DevTypeTy DevType, const AttributeCommonInfo &CommonInfo = {SourceRange{}});
-  static OMPDeclareTargetDeclAttr *CreateImplicit(ASTContext &Ctx, MapTypeTy MapType, DevTypeTy DevType, SourceRange Range, AttributeCommonInfo::Syntax Syntax);
-  static OMPDeclareTargetDeclAttr *Create(ASTContext &Ctx, MapTypeTy MapType, DevTypeTy DevType, SourceRange Range, AttributeCommonInfo::Syntax Syntax);
+  static OMPDeclareTargetDeclAttr *CreateImplicit(ASTContext &Ctx, MapTypeTy MapType, DevTypeTy DevType, unsigned Level, const AttributeCommonInfo &CommonInfo = {SourceRange{}});
+  static OMPDeclareTargetDeclAttr *Create(ASTContext &Ctx, MapTypeTy MapType, DevTypeTy DevType, unsigned Level, const AttributeCommonInfo &CommonInfo = {SourceRange{}});
+  static OMPDeclareTargetDeclAttr *CreateImplicit(ASTContext &Ctx, MapTypeTy MapType, DevTypeTy DevType, unsigned Level, SourceRange Range, AttributeCommonInfo::Syntax Syntax);
+  static OMPDeclareTargetDeclAttr *Create(ASTContext &Ctx, MapTypeTy MapType, DevTypeTy DevType, unsigned Level, SourceRange Range, AttributeCommonInfo::Syntax Syntax);
 
   // Constructors
   OMPDeclareTargetDeclAttr(ASTContext &Ctx, const AttributeCommonInfo &CommonInfo
               , MapTypeTy MapType
               , DevTypeTy DevType
+              , unsigned Level
              );
 
   OMPDeclareTargetDeclAttr *clone(ASTContext &C) const;
@@ -6158,11 +6133,16 @@ public:
 
   static bool ConvertStrToDevTypeTy(StringRef Val, DevTypeTy &Out);
   static const char *ConvertDevTypeTyToStr(DevTypeTy Val);
+  unsigned getLevel() const {
+    return level;
+  }
+
 
     void printPrettyPragma(raw_ostream &OS, const PrintingPolicy &Policy) const;
     static llvm::Optional<MapTypeTy>
     isDeclareTargetDeclaration(const ValueDecl *VD);
     static llvm::Optional<DevTypeTy> getDeviceType(const ValueDecl *VD);
+    static llvm::Optional<SourceLocation> getLocation(const ValueDecl *VD);
   
 
   static bool classof(const Attr *A) { return A->getKind() == attr::OMPDeclareTargetDecl; }

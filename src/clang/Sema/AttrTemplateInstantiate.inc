@@ -169,10 +169,6 @@ Attr *instantiateTemplateAttribute(const Attr *At, ASTContext &C, Sema &S,
       const auto *A = cast<ArmMveStrictPolymorphismAttr>(At);
       return A->clone(C);
     }
-    case attr::ArmSveVectorBits: {
-      const auto *A = cast<ArmSveVectorBitsAttr>(At);
-      return A->clone(C);
-    }
     case attr::Artificial: {
       const auto *A = cast<ArtificialAttr>(At);
       return A->clone(C);
@@ -1523,9 +1519,6 @@ Attr *instantiateTemplateAttributeForDecl(const Attr *At,
       return nullptr;
     }
     case attr::ArmMveStrictPolymorphism: {
-      return nullptr;
-    }
-    case attr::ArmSveVectorBits: {
       return nullptr;
     }
     case attr::Artificial: {

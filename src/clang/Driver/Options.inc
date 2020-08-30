@@ -497,7 +497,7 @@ OPTION(prefix_1, &"-emit-header-module"[1], emit_header_module, Flag, Action_Gro
 OPTION(prefix_1, &"-emit-html"[1], emit_html, Flag, Action_Group, INVALID, nullptr, CC1Option | NoDriverOption, 0,
        "Output input source as HTML", nullptr, nullptr)
 OPTION(prefix_1, &"-emit-interface-stubs"[1], emit_interface_stubs, Flag, Action_Group, INVALID, nullptr, CC1Option, 0,
-       "Generate Inteface Stub Files.", nullptr, nullptr)
+       "Generate Interface Stub Files.", nullptr, nullptr)
 OPTION(prefix_1, &"-emit-llvm-bc"[1], emit_llvm_bc, Flag, Action_Group, INVALID, nullptr, CC1Option | NoDriverOption, 0,
        "Build ASTs then convert to LLVM, emit .bc file", nullptr, nullptr)
 OPTION(prefix_1, &"-emit-llvm-only"[1], emit_llvm_only, Flag, Action_Group, INVALID, nullptr, CC1Option | NoDriverOption, 0,
@@ -866,6 +866,8 @@ OPTION(prefix_1, &"-fexceptions"[1], fexceptions, Flag, f_Group, INVALID, nullpt
 OPTION(prefix_1, &"-fexcess-precision="[1], fexcess_precision_EQ, Joined, clang_ignored_gcc_optimization_f_Group, INVALID, nullptr, Ignored, 0, nullptr, nullptr, nullptr)
 OPTION(prefix_1, &"-fexec-charset="[1], fexec_charset_EQ, Joined, f_Group, INVALID, nullptr, 0, 0, nullptr, nullptr, nullptr)
 OPTION(prefix_1, &"-fexpensive-optimizations"[1], anonymous_11, Flag, clang_ignored_gcc_optimization_f_Group, INVALID, nullptr, Ignored, 0, nullptr, nullptr, nullptr)
+OPTION(prefix_1, &"-fexperimental-debug-variable-locations"[1], fexperimental_debug_variable_locations, Flag, INVALID, INVALID, nullptr, CC1Option | NoDriverOption, 0,
+       "Use experimental new value-tracking variable locations", nullptr, nullptr)
 OPTION(prefix_1, &"-fexperimental-isel"[1], fexperimental_isel, Flag, f_clang_Group, fglobal_isel, nullptr, 0, 0, nullptr, nullptr, nullptr)
 OPTION(prefix_1, &"-fexperimental-new-constant-interpreter"[1], fexperimental_new_constant_interpreter, Flag, f_Group, INVALID, nullptr, CC1Option, 0,
        "Enable the experimental new constant interpreter", nullptr, nullptr)
@@ -1116,6 +1118,8 @@ OPTION(prefix_1, &"-fmax-tokens="[1], fmax_tokens_EQ, Joined, f_Group, INVALID, 
        "Max total number of preprocessed tokens for -Wmax-tokens.", nullptr, nullptr)
 OPTION(prefix_1, &"-fmax-type-align="[1], fmax_type_align_EQ, Joined, f_Group, INVALID, nullptr, CC1Option, 0,
        "Specify the maximum alignment to enforce on pointers lacking an explicit alignment", nullptr, nullptr)
+OPTION(prefix_1, &"-fmemprof"[1], fmemprof, Flag, f_Group, INVALID, nullptr, CC1Option, 0,
+       "Enable heap memory profiling", nullptr, nullptr)
 OPTION(prefix_1, &"-fmerge-all-constants"[1], fmerge_all_constants, Flag, f_Group, INVALID, nullptr, CC1Option | CoreOption, 0,
        "Allow merging of constants", nullptr, nullptr)
 OPTION(prefix_1, &"-fmerge-constants"[1], fmerge_constants, Flag, clang_ignored_gcc_optimization_f_Group, INVALID, nullptr, Ignored, 0, nullptr, nullptr, nullptr)
@@ -1440,6 +1444,8 @@ OPTION(prefix_1, &"-fno-math-errno"[1], fno_math_errno, Flag, f_Group, INVALID, 
        "", nullptr, nullptr)
 OPTION(prefix_1, &"-fno-max-identifier-length"[1], fno_max_identifier_length, Flag, gfortran_Group, INVALID, nullptr, 0, 0, nullptr, nullptr, nullptr)
 OPTION(prefix_1, &"-fno-max-type-align"[1], fno_max_type_align, Flag, f_Group, INVALID, nullptr, 0, 0, nullptr, nullptr, nullptr)
+OPTION(prefix_1, &"-fno-memprof"[1], fno_memprof, Flag, f_Group, INVALID, nullptr, 0, 0,
+       "Disable heap memory profiling", nullptr, nullptr)
 OPTION(prefix_1, &"-fno-merge-all-constants"[1], fno_merge_all_constants, Flag, f_Group, INVALID, nullptr, 0, 0,
        "Disallow merging of constants", nullptr, nullptr)
 OPTION(prefix_1, &"-fno-merge-constants"[1], fno_merge_constants, Flag, clang_ignored_gcc_optimization_f_Group, INVALID, nullptr, Ignored, 0, nullptr, nullptr, nullptr)
@@ -1922,7 +1928,7 @@ OPTION(prefix_1, &"-frecord-command-line"[1], frecord_command_line, Flag, f_clan
 OPTION(prefix_1, &"-frecord-gcc-switches"[1], anonymous_9, Flag, INVALID, frecord_command_line, nullptr, 0, 0, nullptr, nullptr, nullptr)
 OPTION(prefix_1, &"-frecord-marker="[1], frecord_marker_EQ, Joined, gfortran_Group, INVALID, nullptr, 0, 0, nullptr, nullptr, nullptr)
 OPTION(prefix_1, &"-frecovery-ast-type"[1], frecovery_ast_type, Flag, INVALID, INVALID, nullptr, CC1Option | NoDriverOption, 0,
-       "Preserve the type for recovery expressions when possible (experimental)", nullptr, nullptr)
+       "Preserve the type for recovery expressions when possible", nullptr, nullptr)
 OPTION(prefix_1, &"-frecovery-ast"[1], frecovery_ast, Flag, INVALID, INVALID, nullptr, CC1Option | NoDriverOption, 0,
        "Preserve expressions in AST rather than dropping them when encountering semantic errors", nullptr, nullptr)
 OPTION(prefix_1, &"-frecursive"[1], frecursive, Flag, gfortran_Group, INVALID, nullptr, 0, 0, nullptr, nullptr, nullptr)
@@ -2105,7 +2111,7 @@ OPTION(prefix_1, &"-fstack-protector-all"[1], fstack_protector_all, Flag, f_Grou
 OPTION(prefix_1, &"-fstack-protector-strong"[1], fstack_protector_strong, Flag, f_Group, INVALID, nullptr, 0, 0,
        "Enable stack protectors for some functions vulnerable to stack smashing. Compared to -fstack-protector, this uses a stronger heuristic that includes functions containing arrays of any size (and any type), as well as any calls to alloca or the taking of an address from a local variable", nullptr, nullptr)
 OPTION(prefix_1, &"-fstack-protector"[1], fstack_protector, Flag, f_Group, INVALID, nullptr, 0, 0,
-       "Enable stack protectors for some functions vulnerable to stack smashing. This uses a loose heuristic which considers functions vulnerable if they contain a char (or 8bit integer) array or constant sized calls to alloca , which are of greater size than ssp-buffer-size (default: 8 bytes). All variable sized calls to alloca are considered vulnerable. A function witha stack protector has a guard value added to the stack frame that is checked on function exit. The guard value must be positioned in the stack frame such that a buffer overflow from a vulnerable variable will overwrite the guard value before overwriting the function's return address. The reference stack guard value is stored in a global variable.", nullptr, nullptr)
+       "Enable stack protectors for some functions vulnerable to stack smashing. This uses a loose heuristic which considers functions vulnerable if they contain a char (or 8bit integer) array or constant sized calls to alloca , which are of greater size than ssp-buffer-size (default: 8 bytes). All variable sized calls to alloca are considered vulnerable. A function with a stack protector has a guard value added to the stack frame that is checked on function exit. The guard value must be positioned in the stack frame such that a buffer overflow from a vulnerable variable will overwrite the guard value before overwriting the function's return address. The reference stack guard value is stored in a global variable.", nullptr, nullptr)
 OPTION(prefix_1, &"-fstack-size-section"[1], fstack_size_section, Flag, f_Group, INVALID, nullptr, CC1Option, 0,
        "Emit section containing metadata on function stack sizes", nullptr, nullptr)
 OPTION(prefix_1, &"-fstandalone-debug"[1], fstandalone_debug, Flag, f_Group, INVALID, nullptr, CoreOption, 0,
@@ -2834,6 +2840,7 @@ OPTION(prefix_1, &"-mmemops"[1], mmemops, Flag, m_hexagon_Features_Group, INVALI
 OPTION(prefix_1, &"-mmfcrf"[1], mmfcrf, Flag, INVALID, mmfocrf, nullptr, 0, 0, nullptr, nullptr, nullptr)
 OPTION(prefix_1, &"-mmfocrf"[1], mmfocrf, Flag, m_ppc_Features_Group, INVALID, nullptr, 0, 0, nullptr, nullptr, nullptr)
 OPTION(prefix_1, &"-mmicromips"[1], mmicromips, Flag, m_mips_Features_Group, INVALID, nullptr, 0, 0, nullptr, nullptr, nullptr)
+OPTION(prefix_1, &"-mmma"[1], mmma, Flag, m_ppc_Features_Group, INVALID, nullptr, 0, 0, nullptr, nullptr, nullptr)
 OPTION(prefix_1, &"-mmmx"[1], mmmx, Flag, m_x86_Features_Group, INVALID, nullptr, CoreOption, 0, nullptr, nullptr, nullptr)
 OPTION(prefix_1, &"-mmovbe"[1], mmovbe, Flag, m_x86_Features_Group, INVALID, nullptr, CoreOption, 0, nullptr, nullptr, nullptr)
 OPTION(prefix_1, &"-mmovdir64b"[1], mmovdir64b, Flag, m_x86_Features_Group, INVALID, nullptr, CoreOption, 0, nullptr, nullptr, nullptr)
@@ -2960,6 +2967,7 @@ OPTION(prefix_1, &"-mno-mfcrf"[1], mno_mfcrf, Flag, INVALID, mno_mfocrf, nullptr
 OPTION(prefix_1, &"-mno-mfocrf"[1], mno_mfocrf, Flag, m_ppc_Features_Group, INVALID, nullptr, 0, 0, nullptr, nullptr, nullptr)
 OPTION(prefix_1, &"-mno-micromips"[1], mno_micromips, Flag, m_mips_Features_Group, INVALID, nullptr, 0, 0, nullptr, nullptr, nullptr)
 OPTION(prefix_1, &"-mno-mips16"[1], mno_mips16, Flag, m_mips_Features_Group, INVALID, nullptr, 0, 0, nullptr, nullptr, nullptr)
+OPTION(prefix_1, &"-mno-mma"[1], mno_mma, Flag, m_ppc_Features_Group, INVALID, nullptr, 0, 0, nullptr, nullptr, nullptr)
 OPTION(prefix_1, &"-mno-mmx"[1], mno_mmx, Flag, m_x86_Features_Group, INVALID, nullptr, CoreOption, 0, nullptr, nullptr, nullptr)
 OPTION(prefix_1, &"-mno-movbe"[1], mno_movbe, Flag, m_x86_Features_Group, INVALID, nullptr, CoreOption, 0, nullptr, nullptr, nullptr)
 OPTION(prefix_1, &"-mno-movdir64b"[1], mno_movdir64b, Flag, m_x86_Features_Group, INVALID, nullptr, CoreOption, 0, nullptr, nullptr, nullptr)
@@ -3795,6 +3803,8 @@ OPTION(prefix_1, &"-u"[1], u, JoinedOrSeparate, u_Group, INVALID, nullptr, 0, 0,
 OPTION(prefix_2, &"/u"[1], _SLASH_u, Flag, cl_Group, INVALID, nullptr, CLOption | DriverOption | CLOption, 0, nullptr, nullptr, nullptr)
 OPTION(prefix_2, &"/validate-charset-"[1], _SLASH_validate_charset_, Flag, cl_Group, W_Joined, "no-invalid-source-encoding\0", CLOption | DriverOption | CLOption, 0, nullptr, nullptr, nullptr)
 OPTION(prefix_2, &"/validate-charset"[1], _SLASH_validate_charset, Flag, cl_Group, W_Joined, "invalid-source-encoding\0", CLOption | DriverOption | CLOption, 0, nullptr, nullptr, nullptr)
+OPTION(prefix_2, &"/vctoolsdir"[1], _SLASH_vctoolsdir, JoinedOrSeparate, cl_Group, INVALID, nullptr, CLOption | DriverOption | CLOption, 0,
+       "Path to the VCToolChain", "<dir>", nullptr)
 OPTION(prefix_2, &"/vd"[1], _SLASH_vd, Joined, cl_Group, vtordisp_mode_EQ, nullptr, CLOption | DriverOption | CLOption, 0,
        "Control vtordisp placement", nullptr, nullptr)
 OPTION(prefix_1, &"-vectorize-loops"[1], vectorize_loops, Flag, INVALID, INVALID, nullptr, CC1Option | NoDriverOption, 0,

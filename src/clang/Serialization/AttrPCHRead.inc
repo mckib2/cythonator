@@ -357,15 +357,6 @@
     New->setPackExpansion(isPackExpansion);
     break;
   }
-  case attr::ArmSveVectorBits: {
-    bool isImplicit = Record.readInt();
-    bool isPackExpansion = Record.readInt();
-    unsigned numBits = Record.readInt();
-    New = new (Context) ArmSveVectorBitsAttr(Context, Info, numBits);
-    New->setImplicit(isImplicit);
-    New->setPackExpansion(isPackExpansion);
-    break;
-  }
   case attr::Artificial: {
     bool isInherited = Record.readInt();
     bool isImplicit = Record.readInt();
@@ -1908,7 +1899,8 @@
     bool isPackExpansion = Record.readInt();
     OMPDeclareTargetDeclAttr::MapTypeTy mapType(static_cast<OMPDeclareTargetDeclAttr::MapTypeTy>(Record.readInt()));
     OMPDeclareTargetDeclAttr::DevTypeTy devType(static_cast<OMPDeclareTargetDeclAttr::DevTypeTy>(Record.readInt()));
-    New = new (Context) OMPDeclareTargetDeclAttr(Context, Info, mapType, devType);
+    unsigned level = Record.readInt();
+    New = new (Context) OMPDeclareTargetDeclAttr(Context, Info, mapType, devType, level);
     cast<InheritableAttr>(New)->setInherited(isInherited);
     New->setImplicit(isImplicit);
     New->setPackExpansion(isPackExpansion);

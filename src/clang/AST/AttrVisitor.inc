@@ -132,10 +132,6 @@
   bool VisitArmMveStrictPolymorphismAttr(ArmMveStrictPolymorphismAttr *A) {
     return true; 
   }
-  bool TraverseArmSveVectorBitsAttr(ArmSveVectorBitsAttr *A);
-  bool VisitArmSveVectorBitsAttr(ArmSveVectorBitsAttr *A) {
-    return true; 
-  }
   bool TraverseArtificialAttr(ArtificialAttr *A);
   bool VisitArtificialAttr(ArtificialAttr *A) {
     return true; 
@@ -1559,15 +1555,6 @@ bool VISITORCLASS<Derived>::TraverseArmMveStrictPolymorphismAttr(ArmMveStrictPol
   if (!getDerived().VisitAttr(A))
     return false;
   if (!getDerived().VisitArmMveStrictPolymorphismAttr(A))
-    return false;
-  return true;
-}
-
-template <typename Derived>
-bool VISITORCLASS<Derived>::TraverseArmSveVectorBitsAttr(ArmSveVectorBitsAttr *A) {
-  if (!getDerived().VisitAttr(A))
-    return false;
-  if (!getDerived().VisitArmSveVectorBitsAttr(A))
     return false;
   return true;
 }
@@ -4285,8 +4272,6 @@ bool VISITORCLASS<Derived>::TraverseAttr(Attr *A) {
       return getDerived().TraverseArmBuiltinAliasAttr(cast<ArmBuiltinAliasAttr>(A));
     case attr::ArmMveStrictPolymorphism:
       return getDerived().TraverseArmMveStrictPolymorphismAttr(cast<ArmMveStrictPolymorphismAttr>(A));
-    case attr::ArmSveVectorBits:
-      return getDerived().TraverseArmSveVectorBitsAttr(cast<ArmSveVectorBitsAttr>(A));
     case attr::Artificial:
       return getDerived().TraverseArtificialAttr(cast<ArtificialAttr>(A));
     case attr::AsmLabel:

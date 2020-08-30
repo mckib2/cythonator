@@ -36,7 +36,6 @@
 
 TYPE_ATTR(AddressSpace)
 TYPE_ATTR(ArmMveStrictPolymorphism)
-TYPE_ATTR(ArmSveVectorBits)
 TYPE_ATTR(CmseNSCall)
 TYPE_ATTR(NoDeref)
 TYPE_ATTR(ObjCGC)
