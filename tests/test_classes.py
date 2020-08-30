@@ -246,7 +246,7 @@ class TestStructs(unittest.TestCase):
         self.assertEqual(td.name, 'myInt')
         self.assertEqual(td.type.name, 'int')
 
-    def test_field_modifiers(self):
+    def test_data_member_modifiers(self):
         '''Create public data members with various modifiers.'''
         s = _code_run_single_class([
             f'{self.tagName} MyStruct {{',
@@ -269,6 +269,21 @@ class TestStructs(unittest.TestCase):
         self.assertTrue(s.fields[4].type.is_ptr)
         self.assertTrue(s.fields[4].type.is_const_ptr)
 
+    # def test_templated_data_members(self):
+    #     ns = _code_runner([
+    #         'template<class U>',
+    #         f'{self.tagName} T {{ }};',
+    #         '',
+    #         f'{self.tagName} MyStructI {{',
+    #         'public:'*self.is_class,
+    #         '    T<int> myInt;',
+    #         '    T<int&> myInt_ref;',
+    #         '    T<int*> myInt_star;',
+    #         '    T<const int> const_myInt;',
+    #         '    T<int *const> myInt_star_const;',
+    #         '};',
+    #     ])
+    #     print(ns)
 
 class TestClasses(TestStructs):
     def setUp(self):

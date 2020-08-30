@@ -9,7 +9,10 @@ from warnings import warn
 
 from cythonator.write_cython import write_pxd
 
-Type = namedtuple('Type', 'name is_ref is_ptr is_const is_const_ptr')
+
+Type = namedtuple(
+    'Type',
+    'name is_ref is_ptr is_const is_const_ptr template_args')
 Typedef = namedtuple('Typedef', 'id name type referenced')
 TemplateParam = namedtuple(
     'TemplateParam',
@@ -29,21 +32,106 @@ Namespace = namedtuple(
 
 
 def _is_const(type_str):
-    type_str = type_str.strip()
+    type_str = _remove_template_part(type_str).strip()
     if len(type_str) > len('const ') and type_str[:len('const ')] == 'const ':
         return True
     return False
 
 
 def _is_const_ptr(type_str):
-    type_str = type_str.strip().split()
+    type_str = _remove_template_part(type_str).split()
     return '*const' in type_str
 
 
+def _remove_template_part(type_str):
+    # Remove any template part of the string
+    start_idx = type_str.find('<')
+    end_idx = type_str.rfind('>')
+    if start_idx > 0:
+        type_str = type_str[:start_idx] + type_str[end_idx+1:]
+    return type_str.strip()
+
+
+def _is_ptr(type_str):
+    return '*' in _remove_template_part(type_str)
+
+
+def _is_ref(type_str):
+    return '&' in _remove_template_part(type_str)
+
+
 def _sanitize_type_str(type_str):
+    type_str = _remove_template_part(type_str)
     type_str = type_str.replace('*', '').replace('&', '').strip()
     type_str = ' '.join([t for t in type_str.split() if t != 'const'])
     return type_str
+
+
+def _get_template_args(type_str):
+    # If there is a template, we need to recursively resolve it
+    if '<' not in type_str:
+        return []
+
+    # Take contents of the outermost angle bracket pair
+    start_idx = type_str.find('<')
+    end_idx = type_str.rfind('>')
+    template_str = type_str[start_idx+1:end_idx].strip()
+
+    # This could be a comma separated list of potentially templated
+    # types, so separate the types and call recursively to get the
+    # final list
+    # NOTE: we could also create a dummy class to take the parameters
+    # and call clang recursively, but this will probably work, too
+    idx = 0
+    tipe = ''
+    braces = 0
+    types = []
+    recurse = False
+    while idx < len(template_str):
+        # Eat the next type
+        if template_str[idx] == '<':
+            braces += 1
+            recurse = True
+        if template_str[idx] == '>':
+            braces -= 1
+        if braces == 0 and template_str[idx] == ',' and recurse:
+            # print('tipe before recurse is', tipe)
+            # types.append(_get_template_args(tipe)[0])
+            types.append(Type(
+                name=_sanitize_type_str(tipe),
+                is_ref=_is_ref(tipe),
+                is_ptr=_is_ptr(tipe),
+                is_const=_is_const(tipe),
+                is_const_ptr=_is_const_ptr(tipe),
+                template_args=_get_template_args(tipe),
+            ))
+            tipe = ''
+            recurse = False
+        elif braces == 0 and template_str[idx] == ',':
+            types.append(Type(
+                name=_sanitize_type_str(tipe),
+                is_ref=_is_ref(tipe),
+                is_ptr=_is_ptr(tipe),
+                is_const=_is_const(tipe),
+                is_const_ptr=_is_const_ptr(tipe),
+                template_args=[],  # did not recurse
+            ))
+            tipe = ''
+        else:
+            tipe = tipe + template_str[idx]
+            if idx == len(template_str) - 1:
+                types.append(Type(
+                    name=_sanitize_type_str(tipe),
+                    is_ref=_is_ref(tipe),
+                    is_ptr=_is_ptr(tipe),
+                    is_const=_is_const(tipe),
+                    is_const_ptr=_is_const_ptr(tipe),
+                    template_args=[],  # did not recurse
+                ))
+
+        idx += 1
+
+    return types
 
 
 def handle_typedef(node):
@@ -53,10 +141,11 @@ def handle_typedef(node):
         name=node['name'],
         type=Type(
             name=_sanitize_type_str(node['type']['qualType']),
-            is_ref='&' in node['type']['qualType'],
-            is_ptr='*' in node['type']['qualType'],
+            is_ref=_is_ref(node['type']['qualType']),
+            is_ptr=_is_ptr(node['type']['qualType']),
             is_const=_is_const(node['type']['qualType']),
             is_const_ptr=_is_const_ptr(node['type']['qualType']),
+            template_args=_get_template_args(node['type']['qualType']),
         ),
         referenced='isReferenced' in node,
     )
@@ -74,10 +163,11 @@ def handle_function(node):
             tag_used=t['tagUsed'],
             default=Type(
                 name=_sanitize_type_str(t['defaultArg']['type']['qualType']),
-                is_ref='&' in t['defaultArg']['type']['qualType'],
-                is_ptr='*' in t['defaultArg']['type']['qualType'],
+                is_ref=_is_ref(t['defaultArg']['type']['qualType']),
+                is_ptr=_is_ptr(t['defaultArg']['type']['qualType']),
                 is_const=_is_const(t['defaultArg']['type']['qualType']),
                 is_const_ptr=_is_const_ptr(t['defaultArg']['type']['qualType']),
+                template_args=_get_template_args(t['defaultArg']['type']['qualType']),
             ) if 'defaultArg' in t else None,
             is_parameter_pack='isParameterPack' in t and t['isParameterPack'],
         ) for t in node['inner'] if t['kind'] == 'TemplateTypeParmDecl']
@@ -110,10 +200,11 @@ def handle_function(node):
                 name=l['name'] if 'name' in l else None,
                 type=Type(
                     name=_sanitize_type_str(l['type']['qualType']),
-                    is_ref='&' in l['type']['qualType'],
-                    is_ptr='*' in l['type']['qualType'],
+                    is_ref=_is_ref(l['type']['qualType']),
+                    is_ptr=_is_ptr(l['type']['qualType']),
                     is_const=_is_const(l['type']['qualType']),
                     is_const_ptr=_is_const_ptr(l['type']['qualType']),
+                    template_args=_get_template_args(l['type']['qualType']),
                 ),
             ) for l in node['inner'] if l['kind'] == 'ParmVarDecl']
 
@@ -131,10 +222,11 @@ def handle_function(node):
         previously_declared=previously_declared,
         return_type=Type(
             name=_sanitize_type_str(ret_type),
-            is_ref='&' in ret_type,
-            is_ptr='*' in ret_type,
+            is_ref=_is_ref(ret_type),
+            is_ptr=_is_ptr(ret_type),
             is_const=_is_const(ret_type),
             is_const_ptr=_is_const_ptr(ret_type),
+            template_args=_get_template_args(ret_type),
         ),
         params=params,
         templateparams=templateparams,
@@ -190,10 +282,11 @@ def handle_class(node):
             tag_used=t['tagUsed'],
             default=Type(
                 name=_sanitize_type_str(t['defaultArg']['type']['qualType']),
-                is_ref='&' in t['defaultArg']['type']['qualType'],
-                is_ptr='*' in t['defaultArg']['type']['qualType'],
+                is_ref=_is_ref(t['defaultArg']['type']['qualType']),
+                is_ptr=_is_ptr(t['defaultArg']['type']['qualType']),
                 is_const=_is_const(t['defaultArg']['type']['qualType']),
                 is_const_ptr=_is_const_ptr(t['defaultArg']['type']['qualType']),
+                template_args=_get_template_args(t['defaultArg']['type']['qualType']),
             ) if 'defaultArg' in t else None,
             is_parameter_pack='isParameterPack' in t and t['isParameterPack'],
         ) for t in node['inner'] if t['kind'] == 'TemplateTypeParmDecl']
@@ -261,10 +354,11 @@ def handle_class(node):
             name=f['name'],
             type=Type(
                 name=_sanitize_type_str(f['type']['qualType']),
-                is_ref='&' in f['type']['qualType'],
-                is_ptr='*' in f['type']['qualType'],
+                is_ref=_is_ref(f['type']['qualType']),
+                is_ptr=_is_ptr(f['type']['qualType']),
                 is_const=_is_const(f['type']['qualType']),
                 is_const_ptr=_is_const_ptr(f['type']['qualType']),
+                template_args=_get_template_args(f['type']['qualType']),
             ),
         ) for f in node['inner'] if f['kind'] == 'FieldDecl' and f['access'] == 'public'],
         templateparams=templateparams,
@@ -281,7 +375,8 @@ def _get_all_types(thing):
 
     # Find everything that looks like a type
     types = set()
-    for match in re.finditer(r"Type\(name='(?P<name>\w+)', is_ref=(?P<is_ref>\w+), is_ptr=(?P<is_ptr>\w+), is_const=(?P<is_const>\w+)\)", parsable):
+    # TODO: make work with template_args
+    for match in re.finditer(r"Type\(name='(?P<name>\w+)', is_ref=(?P<is_ref>\w+), is_ptr=(?P<is_ptr>\w+), is_const=(?P<is_const>\w+)\), template_args=(?P<template_args>\w+)", parsable):
         types.add(match.group('name'))
     return types
 
