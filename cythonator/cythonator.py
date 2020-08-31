@@ -10,6 +10,10 @@ from warnings import warn
 from cythonator.write_cython import write_pxd
 
 
+# Custom AST nodes (I don't understand Cython ones currently...)
+# TODO: make these treelike -- right now traversal through the
+# tree is by kind of node -- should be as they appear in clang
+# C++ AST to make sure types are declared in correct order
 Type = namedtuple(
     'Type',
     'name is_ref is_ptr is_const is_const_ptr template_args')
@@ -426,7 +430,7 @@ def cythonator(filename: str, clang_exe='clang++-10'):
             print(node['kind'])
 
     # print(global_namespace)
-    # write_pxd(global_namespace, filename)
+    write_pxd(global_namespace, filename)
     # print(_get_all_types(global_namespace))
     return global_namespace
 

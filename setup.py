@@ -92,7 +92,7 @@ def configuration(parent_package='', top_path=None):
 
         # LLVM dependencies
         lib_t('LLVMDemangle'),
-        lib_t('LLVMSupport', link_libs=['LLVMDemangle'], libraries=['dl', 'm', 'rt', 'tinfo'], cmake_subs={'${ALLOCATOR_FILES}': ''}),
+        lib_t('LLVMSupport', link_libs=['LLVMDemangle'], libraries=['dl', 'm', 'rt', 'tinfo', 'z'], cmake_subs={'${ALLOCATOR_FILES}': ''}),
         lib_t('LLVMBinaryFormat', link_libs=['LLVMSupport']),
         lib_t('LLVMDebugInfoMSF', link_libs=['LLVMSupport'], actual_path='DebugInfo/MSF'),
         lib_t('LLVMBitstreamReader', link_libs=['LLVMSupport'], actual_path='Bitstream/Reader'),
@@ -108,6 +108,8 @@ def configuration(parent_package='', top_path=None):
         lib_t('LLVMAnalysis', link_libs=['LLVMSupport', 'LLVMProfileData', 'LLVMCore', 'LLVMObject', 'LLVMBinaryFormat']),
         lib_t('LLVMTransformUtils', link_libs=['LLVMSupport', 'LLVMCore', 'LLVMAnalysis'], actual_path='Transforms/Utils'),
         lib_t('LLVMFrontendOpenMP', link_libs=['LLVMSupport', 'LLVMTransformUtils', 'LLVMCore'], actual_path='Frontend/OpenMP', extra_source_dirs=['src/Frontend/OpenMP/']),
+        lib_t('LLVMOption', link_libs=['LLVMSupport'], libraries=['dl', 'm', 'rt', 'tinfo', 'z']),
+
 
         # Clang dependencies
         lib_t('clangBasic', link_libs=['LLVMMC', 'LLVMSupport', 'LLVMCore'], END_TOKEN='${version_inc}', extra_library_dirs=[CLANG_DIR / 'lib/Basic']),
@@ -126,6 +128,39 @@ def configuration(parent_package='', top_path=None):
         lib_t('clangToolingInclusions', link_libs=['LLVMSupport', 'clangBasic', 'clangLex', 'clangRewrite', 'clangToolingCore'], actual_path='Tooling/Inclusions'),
         lib_t('clangFormat', link_libs=['LLVMSupport', 'clangBasic', 'clangLex', 'clangToolingCore', 'clangToolingInclusions']),
         lib_t('clangTooling', link_libs=['LLVMFrontendOpenMP', 'LLVMOption', 'LLVMSupport', 'clangAST', 'clangASTMatchers', 'clangBasic', 'clangDriver', 'clangFormat', 'clangFrontend', 'clangLex', 'clangRewrite', 'clangSerialization', 'clangToolingCore'], END_TOKEN='DEPENDS'),
+
+        # We are currently missing symbol: undefined symbol: _ZTIN4llvm21PrettyStackTraceEntryE
+
+        # Additional LLVM dependencies for clangCodeGen
+        # lib_t('LLVMAggressiveInstCombine'),
+        # lib_t('LLVMBitWriter'),
+        # lib_t('LLVMCoroutines'),
+        # lib_t('LLVMCoverage'),
+        # lib_t('LLVMExtensions'),
+        # lib_t('LLVMIRReader'),
+        # lib_t('LLVMInstCombine'),
+        # lib_t('LLVMInstrumentation'),
+        # lib_t('LLVMLTO'),
+        # lib_t('LLVMLinker'),
+        # lib_t('LLVMObjCARCOpts'),
+        # lib_t('LLVMPasses'),
+        # lib_t('LLVMRemarks'),
+        # lib_t('LLVMScalarOpts'),
+        # lib_t('LLVMTarget'),
+        # lib_t('LLVMTransformUtils'),
+        # lib_t('LLVMipo'),
+
+        # # Additional dependencies of clang-interpreter
+        # lib_t('LLVMExecutionEngine'),
+        # lib_t('LLVMMCJIT'),
+        # lib_t('LLVMOrcJIT'),
+        # lib_t('LLVMRuntimeDyld'),
+        # lib_t('LLVMX86AsmParser'),
+        # lib_t('LLVMX86CodeGen'),
+        # lib_t('LLVMX86Desc'),
+        # lib_t('LLVMX86Disassembler'),
+        # lib_t('LLVMX86Info'),
+        # lib_t('clangCodeGen', link_libs=['LLVMAggressiveInstCombine', 'LLVMAnalysis', 'LLVMBitReader', 'LLVMBitWriter', 'LLVMCore', 'LLVMCoroutines', 'LLVMCoverage', 'LLVMExtensions', 'LLVMFrontendOpenMP', 'LLVMIRReader', 'LLVMInstCombine', 'LLVMInstrumentation', 'LLVMLTO', 'LLVMLinker', 'LLVMMC', 'LLVMObjCARCOpts', 'LLVMObject', 'LLVMPasses', 'LLVMProfileData', 'LLVMRemarks', 'LLVMScalarOpts', 'LLVMSupport', 'LLVMTarget', 'LLVMTransformUtils', 'LLVMipo', 'clangAST', 'clangASTMatchers', 'clangAnalysis', 'clangBasic', 'clangFrontend', 'clangLex', 'clangSerialization']),
     ]
 
     for l in libs:
@@ -133,7 +168,7 @@ def configuration(parent_package='', top_path=None):
             l.name,
             sources=l.get_sources(),
             include_dirs=l.get_includes(),
-            libraries=l.link_libs,#l.libraries + l.link_libs,
+            libraries=l.libraries + l.link_libs,
             language='c++',
             # extra_compiler_args=[
             cflags = [
@@ -173,15 +208,20 @@ def configuration(parent_package='', top_path=None):
         'tests.build_test',
         sources=[
             'tests/build_test.pyx',
-            CLANG_DIR / 'examples/clang-interpreter/main.cpp',
+            'tests/simple.cpp',
+            # 'tests/main.cpp',  # my modified version
+            # CLANG_DIR / 'examples/clang-interpreter/main.cpp',
         ],
         include_dirs=[
             'src/',
             CLANG_DIR / 'include',
             LLVM_DIR / 'include',
         ],
-        libraries=[l.name for l in libs],  # include all only once
+        libraries=[l.name for l in libs[::-1]] + ['dl', 'm', 'rt', 'tinfo', 'z'],
+        # libraries=['clangTooling'],
         language='c++',
+        extra_compile_args=['-fpermissive'],
+        # extra_link_args=['-Wl,-z,defs'],
     )
 
     return config
