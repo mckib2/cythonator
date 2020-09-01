@@ -10,7 +10,10 @@ def _type_str(t):
     if t.is_ref:
         s += '&'
     elif t.is_ptr:
-        s += '*'
+        if t.is_const_ptr:
+            s += ' *const'
+        else:
+            s += '*'
     if t.is_const:
         s = 'const ' + s
     return s
@@ -42,7 +45,7 @@ def _print_typedef(t, indent_lvl):
 
 
 def _print_field(f, indent_lvl):
-    return TAB*indent_lvl + 'cdef {type} {name}\n'.format(
+    return TAB*indent_lvl + '{type} {name}\n'.format(
         type=_type_str(f.type),
         name=f.name,
     )

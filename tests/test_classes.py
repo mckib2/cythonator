@@ -253,10 +253,14 @@ class TestStructs(unittest.TestCase):
             f'{self.tagName} MyStruct {{',
             'public:'*self.is_class,
             '    int myInt;',
-            '    int& myInt_ref;',
-            '    int* myInt_star;',
-            '    const int const_myInt;',
-            '    int *const myInt_star_const;',
+            '    int     &   myInt_ref;',
+            '    int // some comment here',
+            '* myInt_star;',
+            '    const int /* this is obtrusive */ const_myInt;',
+            '    int *',
+            'const // this is a const ptr, not const val',
+            'myInt_star_const',
+            ';',
             '};',
         ])
         self.assertEqual(s.fields[0].name, 'myInt')
