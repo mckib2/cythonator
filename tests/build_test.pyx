@@ -36,7 +36,8 @@ cdef char ** to_cstring_array(list_str):
 cdef extern from "simple.hpp" nogil:
     int simple(int argc, const char ** argv)
 
-def test_simple(int argc, args):
+def test_simple(args):
+    cdef int argc = len(args)
     cdef char **argv = to_cstring_array(args)
     cdef int res = simple(argc, argv)
     free(argv)

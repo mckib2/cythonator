@@ -128,6 +128,7 @@ def configuration(parent_package='', top_path=None):
         lib_t('clangToolingInclusions', link_libs=['LLVMSupport', 'clangBasic', 'clangLex', 'clangRewrite', 'clangToolingCore'], actual_path='Tooling/Inclusions'),
         lib_t('clangFormat', link_libs=['LLVMSupport', 'clangBasic', 'clangLex', 'clangToolingCore', 'clangToolingInclusions']),
         lib_t('clangTooling', link_libs=['LLVMFrontendOpenMP', 'LLVMOption', 'LLVMSupport', 'clangAST', 'clangASTMatchers', 'clangBasic', 'clangDriver', 'clangFormat', 'clangFrontend', 'clangLex', 'clangRewrite', 'clangSerialization', 'clangToolingCore'], END_TOKEN='DEPENDS'),
+        lib_t('clangRewriteFrontend', link_libs=['LLVMSupport', 'clangBasic', 'clangLex'], actual_path='Frontend/Rewrite')
 
         # We are currently missing symbol: undefined symbol: _ZTIN4llvm21PrettyStackTraceEntryE
 
@@ -208,7 +209,8 @@ def configuration(parent_package='', top_path=None):
         'tests.build_test',
         sources=[
             'tests/build_test.pyx',
-            'tests/simple.cpp',
+            'tests/clang-tool.cpp',
+            # 'tests/simple.cpp',
             # 'tests/main.cpp',  # my modified version
             # CLANG_DIR / 'examples/clang-interpreter/main.cpp',
         ],

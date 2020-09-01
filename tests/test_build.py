@@ -10,4 +10,4 @@
 
 from build_test import test_simple
 
-print(test_simple(2, ['myTool', '--help']))
+test_simple(['myTool', '--ast-dump', 'tests/simple.hpp'])
