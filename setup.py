@@ -171,8 +171,7 @@ def configuration(parent_package='', top_path=None):
             include_dirs=l.get_includes(),
             libraries=l.libraries + l.link_libs,
             language='c++',
-            # extra_compiler_args=[
-            cflags = [
+            cflags=[
                 '-Wno-strict-aliasing',
                 '-Wno-maybe-uninitialized',
                 '-Wno-comment',
@@ -220,7 +219,6 @@ def configuration(parent_package='', top_path=None):
             LLVM_DIR / 'include',
         ],
         libraries=[l.name for l in libs[::-1]] + ['dl', 'm', 'rt', 'tinfo', 'z'],
-        # libraries=['clangTooling'],
         language='c++',
         extra_compile_args=['-fpermissive'],
         # extra_link_args=['-Wl,-z,defs'],

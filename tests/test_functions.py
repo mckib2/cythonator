@@ -1,11 +1,11 @@
 '''Tests on functions.'''
 
 import unittest
-from collections import defaultdict
 
 import numpy as np
 
 from .utils import _code_runner, _code_run_single_fun
+
 
 class TestFunctionsNoArgs(unittest.TestCase):
     def test_void(self):
@@ -60,10 +60,12 @@ class TestFunctionsNoArgs(unittest.TestCase):
 
     def test_namespaced_void(self):
         ns = _code_runner('namespace ns { void void_ns_function(); }')
-        self.assertEqual(len(ns.functions), 0)
-        self.assertEqual(len(ns.namespaces), 1)
-        self.assertEqual(len(ns.namespaces[0].functions), 1)
-        fun = ns.namespaces[0].functions[0]
+        funs = [f for f in ns.children if f.__class__.__name__ == 'Function']
+        namespaces = [n for n in ns.children if n.__class__.__name__ == 'Namespace']
+        self.assertEqual(len(funs), 0)
+        self.assertEqual(len(namespaces), 1)
+        self.assertEqual(len(namespaces[0].children), 1)
+        fun = namespaces[0].children[0]
         self.assertEqual(fun.name, 'void_ns_function')
         self.assertEqual(fun.return_type.name, 'void')
 
@@ -172,13 +174,19 @@ class TestFunctionsWithArgs(unittest.TestCase):
         self.assertTrue(f.templateparams[1].is_parameter_pack)
 
     def test_unnamed_template_parameter_pack(self):
-        f = _code_run_single_fun('\n'.join([
+        f = _code_run_single_fun([
             'template<class T, typename...>',
             'void tfun();',
-        ]))
+        ])
         self.assertFalse(f.templateparams[0].is_parameter_pack)
         self.assertTrue(f.templateparams[1].is_parameter_pack)
         self.assertEqual(f.templateparams[1].name, None)
+
+    def test_double_star(self):
+        f = _code_run_single_fun([
+            'char** func(int ** myInt);'
+        ])
+        print(f)
 
 
 if __name__ == '__main__':

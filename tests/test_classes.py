@@ -60,23 +60,22 @@ class TestStructs(unittest.TestCase):
             f'{self.tagName} Base {{ }};',
             f'{self.tagName} Child : Base {{ }};',
         ])
-        self.assertTrue(len(ns.classes), 2)
-        b, c = ns.classes[0], ns.classes[1]
+        self.assertTrue(len(ns.children), 2)
+        b, c = ns.children[0], ns.children[1]
         self.assertEqual(len(b.bases), 0)
         self.assertEqual(len(c.bases), 1)
         self.assertEqual(c.bases[0], 'Base')
 
     def test_inheritance_from_different_namespace(self):
-        # ns = _code_runner([
-        #     f'namespace ns {{ {self.tagName} Base {{ }}; }}',
-        #     'struct Child : ns::Base {};',
-        # ])
-        # b = ns.namespaces[0].classes[0]
-        # c = ns.classes[0]
-        # self.assertEqual(len(b.bases), 0)
-        # self.assertEqual(len(c.bases), 1)
-        # self.assertEqual(c.bases[0], 'ns::Base')
-        pass
+        ns = _code_runner([
+            f'namespace ns {{ {self.tagName} Base {{ }}; }}',
+            'struct Child : ns::Base {};',
+        ])
+        b = ns.children[0].children[0]
+        c = ns.children[1]
+        self.assertEqual(len(b.bases), 0)
+        self.assertEqual(len(c.bases), 1)
+        self.assertEqual(c.bases[0], 'ns::Base')
 
     def test_removal_of_implicit_functions_from_virtual(self):
         with self.assertWarns(UserWarning):
@@ -228,8 +227,8 @@ class TestStructs(unittest.TestCase):
             '};',
         ])
         self.assertEqual(s.name, 'MyStruct')
-        self.assertEqual(len(s.classes), 1)
-        self.assertEqual(s.classes[0].name, 'MyInnerStruct')
+        self.assertEqual(len(s.children), 1)
+        self.assertEqual(s.children[0].name, 'MyInnerStruct')
 
     def test_curiously_recurring_template_pattern(self):
         pass
@@ -289,6 +288,7 @@ class TestStructs(unittest.TestCase):
     #         '};',
     #     ])
     #     print(ns)
+
 
 class TestClasses(TestStructs):
     def setUp(self):

@@ -99,57 +99,51 @@ def _print_class(c, indent_lvl):
     for m in c.methods:
         pxd += _print_method(m, indent_lvl)
 
-    # Recursively handle inner structs/classes
-    if c.classes:
-        pxd += TAB*indent_lvl + '# CLASSES\n'
-    for ic in c.classes:
-        pxd += _print_class(ic, indent_lvl)
+    # Recursively handle children
+    if c.children:
+        pxd += TAB*indent_lvl + '# CHILDREN\n'
+    for ic in c.children:
+        if ic.__class__.__name__ == 'Class':
+            pxd += _print_class(ic, indent_lvl)
 
-    if not (c.typedefs or c.fields or c.methods or c.classes):
+    if not (c.typedefs or c.fields or c.methods or c.children):
         pxd += TAB*indent_lvl + 'pass\n'
 
     indent_lvl -= 1
     return pxd
 
 
+def _print_extern(namespace, headerfile, indent_lvl):
+    return TAB*indent_lvl + 'cdef extern from "{headerfile}"{namespace} nogil:\n'.format(
+        headerfile=pathlib.Path(headerfile).resolve(),
+        namespace='' if not namespace.name else f' namespace "{namespace.name}"',
+    )
+
+
 def write_pxd(namespace, headerfile: str, indent_lvl=0):
     '''Translate a namespace tree into a PXD file.'''
 
     pxd = ''
-    pxd += TAB*indent_lvl + 'cdef extern from "{headerfile}"{namespace} nogil:\n'.format(
-        headerfile=pathlib.Path(headerfile).resolve(),
-        namespace='' if not namespace.name else f' namespace "{namespace.name}"',
-    )
-    indent_lvl += 1
 
-    # Typedefs
-    if namespace.typedefs:
-        pxd += TAB*indent_lvl + '# TYPEDEFS\n'
-    for t in namespace.typedefs:
-        pxd += _print_typedef(t, indent_lvl)
+    # handle children in order
+    for child in namespace.children:
+        typestr = child.__class__.__name__
+        if typestr == 'Typedef':
+            pxd += _print_extern(namespace, headerfile, indent_lvl)
+            pxd += _print_typedef(child, indent_lvl+1)
+        elif typestr == 'Function':
+            # TODO: handle redeclaration
+            pxd += _print_extern(namespace, headerfile, indent_lvl)
+            pxd += _print_function(child, indent_lvl+1)
+        elif typestr == 'Class':
+            pxd += _print_extern(namespace, headerfile, indent_lvl)
+            pxd += _print_class(child, indent_lvl+1)
+        elif typestr == 'Namespace':
+            # Start a new extern block for this namespace
+            pxd += write_pxd(
+                child, headerfile, indent_lvl=0)
 
-    # Functions
-    # TODO: handle redeclaration
-    if namespace.functions:
-        pxd += TAB*indent_lvl + '# FUNCTIONS\n'
-    for f in namespace.functions:
-        pxd += _print_function(f, indent_lvl)
-
-    # Structs/classes
-    pxd += TAB*indent_lvl + '# CLASSES\n'
-    for c in namespace.classes:
-        pxd += _print_class(c, indent_lvl)
-
-    # Recursively handle inner namespaces
-    if namespace.namespaces:
-        pxd += TAB*indent_lvl + '# NAMESPACES\n'
-    for ns in namespace.namespaces:
-        # print(headerfile)
-        print(namespace)
-        pxd += write_pxd(
-            ns, headerfile, indent_lvl=indent_lvl)
-
-    print(pxd)
+    return pxd
 
 
 if __name__ == '__main__':

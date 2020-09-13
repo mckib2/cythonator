@@ -10,10 +10,8 @@ from warnings import warn
 from cythonator.write_cython import write_pxd
 
 
-# Custom AST nodes (I don't understand Cython ones currently...)
-# TODO: make these treelike -- right now traversal through the
-# tree is by kind of node -- should be as they appear in clang
-# C++ AST to make sure types are declared in correct order
+# Custom AST nodes -- I don't think Cython ones currently do all the
+# things we need
 Type = namedtuple(
     'Type',
     'name is_ref is_ptr is_const is_const_ptr template_args')
@@ -24,7 +22,7 @@ TemplateParam = namedtuple(
 Param = namedtuple('Param', 'id name type')
 Class = namedtuple(
         'Class',
-        'id name is_struct methods fields templateparams bases typedefs classes')
+        'id name is_struct methods fields templateparams bases typedefs children')
 Function = namedtuple(
     'Function',
     'id name previously_declared return_type params templateparams')
@@ -32,7 +30,7 @@ Method = namedtuple('Method', 'function is_ctor')
 Field = namedtuple('Field', 'id name type')
 Namespace = namedtuple(
     'Namespace',
-    'id name functions typedefs namespaces classes')
+    'id name children')
 
 
 def _is_const(type_str):
@@ -138,19 +136,27 @@ def _get_template_args(type_str):
     return types
 
 
+def handle_type(t):
+    if not isinstance(t, str):
+        t = t['qualType']
+
+    return Type(
+        name=_sanitize_type_str(t),
+        is_ref=_is_ref(t),
+        is_ptr=_is_ptr(t),
+        is_const=_is_const(t),
+        is_const_ptr=_is_const_ptr(t),
+        template_args=_get_template_args(t),
+        # clang_str=t,
+    )
+
+
 def handle_typedef(node):
     # NOTE: we can get aliases here if we needed them
     return Typedef(
         id=node['id'],
         name=node['name'],
-        type=Type(
-            name=_sanitize_type_str(node['type']['qualType']),
-            is_ref=_is_ref(node['type']['qualType']),
-            is_ptr=_is_ptr(node['type']['qualType']),
-            is_const=_is_const(node['type']['qualType']),
-            is_const_ptr=_is_const_ptr(node['type']['qualType']),
-            template_args=_get_template_args(node['type']['qualType']),
-        ),
+        type=handle_type(node['type']),
         referenced='isReferenced' in node,
     )
 
@@ -165,14 +171,7 @@ def handle_function(node):
             name=t['name'] if 'name' in t else None,
             referenced='isReferenced' in t and t['isReferenced'],
             tag_used=t['tagUsed'],
-            default=Type(
-                name=_sanitize_type_str(t['defaultArg']['type']['qualType']),
-                is_ref=_is_ref(t['defaultArg']['type']['qualType']),
-                is_ptr=_is_ptr(t['defaultArg']['type']['qualType']),
-                is_const=_is_const(t['defaultArg']['type']['qualType']),
-                is_const_ptr=_is_const_ptr(t['defaultArg']['type']['qualType']),
-                template_args=_get_template_args(t['defaultArg']['type']['qualType']),
-            ) if 'defaultArg' in t else None,
+            default=handle_type(t['defaultArg']['type']) if 'defaultArg' in t else None,
             is_parameter_pack='isParameterPack' in t and t['isParameterPack'],
         ) for t in node['inner'] if t['kind'] == 'TemplateTypeParmDecl']
 
@@ -202,14 +201,7 @@ def handle_function(node):
             params = [Param(
                 id=l['id'],
                 name=l['name'] if 'name' in l else None,
-                type=Type(
-                    name=_sanitize_type_str(l['type']['qualType']),
-                    is_ref=_is_ref(l['type']['qualType']),
-                    is_ptr=_is_ptr(l['type']['qualType']),
-                    is_const=_is_const(l['type']['qualType']),
-                    is_const_ptr=_is_const_ptr(l['type']['qualType']),
-                    template_args=_get_template_args(l['type']['qualType']),
-                ),
+                type=handle_type(l['type']),
             ) for l in node['inner'] if l['kind'] == 'ParmVarDecl']
 
     else:
@@ -224,30 +216,37 @@ def handle_function(node):
         id=node['id'],
         name=node['name'],
         previously_declared=previously_declared,
-        return_type=Type(
-            name=_sanitize_type_str(ret_type),
-            is_ref=_is_ref(ret_type),
-            is_ptr=_is_ptr(ret_type),
-            is_const=_is_const(ret_type),
-            is_const_ptr=_is_const_ptr(ret_type),
-            template_args=_get_template_args(ret_type),
-        ),
+        return_type=handle_type(ret_type),
         params=params,
         templateparams=templateparams,
     )
 
 
-def handle_namespace(node):
+def handle_namespace(node, parent_node=None):
     if 'inner' not in node:
         node['inner'] = []
 
+    if parent_node is None:
+        qualified_ns = node['name']
+    else:
+        qualified_ns = parent_node['name'] + '::' + node['name']
+
+    # gather all children contained in namespace
+    children = []
+    for thing in node['inner']:
+        if thing['kind'] in {'FunctionDecl', 'FunctionTemplateDecl'}:
+            children.append(handle_function(thing))
+        elif thing['kind'] == 'TypedefDecl':
+            children.append(handle_typedef(thing))
+        elif thing['kind'] == 'NamespaceDecl' and 'name' in node:
+            children.append(handle_namespace(thing, node))
+        elif thing['kind'] in {'CXXRecordDecl', 'ClassTemplateDecl'}:
+            children.append(handle_class(thing))
+
     return Namespace(
         id=node['id'],
-        name=node['name'],
-        functions=[handle_function(f) for f in node['inner'] if f['kind'] in {'FunctionDecl', 'FunctionTemplateDecl'}],
-        typedefs=[handle_typedef(t) for t in node['inner'] if t['kind'] == 'TypedefDecl'],
-        namespaces=[handle_namespace(n) for n in node['inner'] if n['kind'] == 'NamespaceDecl'] and 'name' in node,
-        classes=[handle_class(c) for c in node['inner'] if c['kind'] in {'CXXRecordDecl', 'ClassTemplateDecl'}],
+        name=qualified_ns,
+        children=children,
     )
 
 
@@ -284,14 +283,7 @@ def handle_class(node):
             name=t['name'] if 'name' in t else None,
             referenced='isReferenced' in t and t['isReferenced'],
             tag_used=t['tagUsed'],
-            default=Type(
-                name=_sanitize_type_str(t['defaultArg']['type']['qualType']),
-                is_ref=_is_ref(t['defaultArg']['type']['qualType']),
-                is_ptr=_is_ptr(t['defaultArg']['type']['qualType']),
-                is_const=_is_const(t['defaultArg']['type']['qualType']),
-                is_const_ptr=_is_const_ptr(t['defaultArg']['type']['qualType']),
-                template_args=_get_template_args(t['defaultArg']['type']['qualType']),
-            ) if 'defaultArg' in t else None,
+            default=handle_type(t['defaultArg']['type']) if 'defaultArg' in t else None,
             is_parameter_pack='isParameterPack' in t and t['isParameterPack'],
         ) for t in node['inner'] if t['kind'] == 'TemplateTypeParmDecl']
 
@@ -342,6 +334,12 @@ def handle_class(node):
         elif thing['kind'] == 'AccessSpecDecl':
             current_access = thing['access']
 
+    # gather up all children
+    children = []
+    for thing in node['inner']:
+        if thing['kind'] in {'CXXRecordDecl', 'ClassTemplateDecl'} and thing['name'] != node['name']:
+            children.append(handle_class(thing))
+
     return Class(
         id=node['id'],
         name=node['name'],
@@ -356,19 +354,12 @@ def handle_class(node):
         fields=[Field(
             id=f['id'],
             name=f['name'],
-            type=Type(
-                name=_sanitize_type_str(f['type']['qualType']),
-                is_ref=_is_ref(f['type']['qualType']),
-                is_ptr=_is_ptr(f['type']['qualType']),
-                is_const=_is_const(f['type']['qualType']),
-                is_const_ptr=_is_const_ptr(f['type']['qualType']),
-                template_args=_get_template_args(f['type']['qualType']),
-            ),
+            type=handle_type(f['type']),
         ) for f in node['inner'] if f['kind'] == 'FieldDecl' and f['access'] == 'public'],
         templateparams=templateparams,
         bases=bases,
         typedefs=[handle_typedef(t) for t in node['inner'] if t['kind'] == 'TypedefDecl'],
-        classes=[handle_class(c) for c in node['inner'] if c['kind'] in {'CXXRecordDecl', 'ClassTemplateDecl'} and c['name'] != node['name']],
+        children=children,
     )
 
 
@@ -405,32 +396,30 @@ def cythonator(filename: str, clang_exe='clang++-10'):
     global_namespace = Namespace(
         id='_global_namespace',
         name='',
-        functions=[],
-        typedefs=[],
-        namespaces=[],
-        classes=[],
+        children=[],
     )
     for node in ast['inner']:
         if node['kind'] in {'FunctionDecl', 'FunctionTemplateDecl'}:
             # print(node)
-            global_namespace.functions.append(handle_function(node))
-        elif node['kind'] == 'NamespaceDecl' and 'name' in node: # ignore anonymous namespaces
-            global_namespace.namespaces.append(handle_namespace(node))
+            global_namespace.children.append(handle_function(node))
+        elif node['kind'] == 'NamespaceDecl' and 'name' in node:  # ignore anonymous namespaces
+            global_namespace.children.append(handle_namespace(node))
         elif node['kind'] == 'TypedefDecl':
             # ignore double underscored typedefs
             if node['name'].startswith('__'):
                 continue
-            global_namespace.typedefs.append(handle_typedef(node))
+            global_namespace.children.append(handle_typedef(node))
         elif node['kind'] in {'CXXRecordDecl', 'ClassTemplateDecl'}:
             # both structs and classes
             # print(json.dumps(node, indent=4))
-            global_namespace.classes.append(handle_class(node))
+            global_namespace.children.append(handle_class(node))
             # print(handle_class(node))
         else:
             print(node['kind'])
 
     # print(global_namespace)
-    write_pxd(global_namespace, filename)
+    pxd = write_pxd(global_namespace, filename)
+    print(pxd)
     # print(_get_all_types(global_namespace))
     return global_namespace
 

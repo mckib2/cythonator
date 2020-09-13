@@ -13,8 +13,12 @@ def _code_runner(code):
 
 
 def _code_run_single_fun(code):
-    return _code_runner(code).functions[0]
+    return _code_runner(code).children[0]
 
 
 def _code_run_single_class(code):
-    return _code_runner(code).classes[0]
+    return _code_runner(code).children[0]
+
+
+def _code_run_single_typedef(code):
+    return _code_runner(code).children[0]
