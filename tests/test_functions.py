@@ -186,8 +186,23 @@ class TestFunctionsWithArgs(unittest.TestCase):
         f = _code_run_single_fun([
             'char** func(int ** myInt);'
         ])
-        print(f)
+        self.assertEqual(f.params[0].type.name, 'int')
+        self.assertTrue(f.params[0].type.is_ptr)
+        self.assertEqual(f.params[0].type.clang_str, 'int **')
 
+    def test_array(self):
+        f = _code_run_single_fun([
+            'int func(int[]);'
+        ])
+        # arrays are interpreted as simply pointers
+        self.assertEqual(f.params[0].type.name, 'int')
+        self.assertTrue(f.params[0].type.is_ptr)
+
+    def test_mdarray(self):
+        f = _code_run_single_fun([
+            'int func(int*[1][1]);'
+        ])
+        print(f)
 
 if __name__ == '__main__':
     unittest.main()

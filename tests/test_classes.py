@@ -151,7 +151,7 @@ class TestStructs(unittest.TestCase):
         self.assertEqual(s.templateparams[0].tag_used, 'typename')
 
     def test_nontype_template(self):
-        with self.assertWarns(UserWarning):
+        with self.assertWarns(UserWarning), self.assertRaises(ValueError):
             s = _code_run_single_class([
                 'template<int N>',
                 f'{self.tagName} MyStruct {{',
@@ -159,8 +159,8 @@ class TestStructs(unittest.TestCase):
                 '    double myArray[N];',
                 '};',
             ])
-        # Cython does not support nontype templates! Should be no params
-        self.assertEqual(len(s.templateparams), 0)
+            # Cython does not support nontype templates! Should be no params
+            self.assertEqual(len(s.templateparams), 0)
 
     def test_default_template(self):
         s = _code_run_single_class([
@@ -190,7 +190,7 @@ class TestStructs(unittest.TestCase):
         self.assertEqual(s.templateparams[1].name, None)
 
     def test_nested_templates(self):
-        with self.assertWarns(UserWarning):
+        with self.assertWarns(UserWarning), self.assertRaises(ValueError):
             s = _code_run_single_class([
                 'template <class SomeType, template <class> class OtherType>',
                 f'{self.tagName} NestedTemplateStruct {{',
@@ -198,8 +198,8 @@ class TestStructs(unittest.TestCase):
                 '    OtherType<SomeType> f;',
                 '};',
             ])
-        # template-template parameters are currently not supported
-        self.assertEqual(len(s.templateparams), 1)
+            # template-template parameters are currently not supported
+            self.assertEqual(len(s.templateparams), 1)
 
     def test_templated_methods(self):
         s = _code_run_single_class([

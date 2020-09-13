@@ -14,7 +14,7 @@ from cythonator.write_cython import write_pxd
 # things we need
 Type = namedtuple(
     'Type',
-    'name is_ref is_ptr is_const is_const_ptr template_args')
+    'name is_ref is_ptr is_const is_const_ptr is_arr template_args clang_str')
 Typedef = namedtuple('Typedef', 'id name type referenced')
 TemplateParam = namedtuple(
     'TemplateParam',
@@ -62,10 +62,15 @@ def _is_ref(type_str):
     return '&' in _remove_template_part(type_str)
 
 
+def _is_arr(type_str):
+    return '[' in _remove_template_part(type_str)
+
+
 def _sanitize_type_str(type_str):
     type_str = _remove_template_part(type_str)
     type_str = type_str.replace('*', '').replace('&', '').strip()
     type_str = ' '.join([t for t in type_str.split() if t != 'const'])
+    type_str = type_str.split('()')[0].strip()
     return type_str
 
 
@@ -105,7 +110,9 @@ def _get_template_args(type_str):
                 is_ptr=_is_ptr(tipe),
                 is_const=_is_const(tipe),
                 is_const_ptr=_is_const_ptr(tipe),
+                is_arr=_is_arr(tipe),
                 template_args=_get_template_args(tipe),
+                clang_str=tipe,
             ))
             tipe = ''
             recurse = False
@@ -116,7 +123,9 @@ def _get_template_args(type_str):
                 is_ptr=_is_ptr(tipe),
                 is_const=_is_const(tipe),
                 is_const_ptr=_is_const_ptr(tipe),
+                is_arr=_is_arr(tipe),
                 template_args=[],  # did not recurse
+                clang_str=tipe,
             ))
             tipe = ''
         else:
@@ -128,7 +137,9 @@ def _get_template_args(type_str):
                     is_ptr=_is_ptr(tipe),
                     is_const=_is_const(tipe),
                     is_const_ptr=_is_const_ptr(tipe),
+                    is_arr=_is_arr(tipe),
                     template_args=[],  # did not recurse
+                    clang_str=tipe,
                 ))
 
         idx += 1
@@ -146,8 +157,9 @@ def handle_type(t):
         is_ptr=_is_ptr(t),
         is_const=_is_const(t),
         is_const_ptr=_is_const_ptr(t),
+        is_arr=_is_arr(t),
         template_args=_get_template_args(t),
-        # clang_str=t,
+        clang_str=t,
     )
 
 
@@ -188,24 +200,24 @@ def handle_function(node):
         # FunctionTemplateDecl contains FunctionDecl or CXXMethodDecl
         node = [l for l in node['inner'] if l['kind'] in {'FunctionDecl', 'CXXMethodDecl'}][0]
 
-    # Will this split always work?
-    types = node['type']['qualType'].split('(')
-    params = ()
-    if isinstance(types, str):
-        ret_type = types.strip()
-    elif len(types) == 2:
-        ret_type = types[0].strip()
+    # eat the return type
+    ret_type = ''
+    ii = 0
+    next_char = node['type']['qualType'][ii]
+    while next_char != '(':
+        ret_type += next_char
+        ii += 1
+        next_char = node['type']['qualType'][ii]
 
-        # 'inner' may have param info
-        if 'inner' in node:
-            params = [Param(
+    # Get the function params
+    if 'inner' in node:
+        params = [Param(
                 id=l['id'],
                 name=l['name'] if 'name' in l else None,
                 type=handle_type(l['type']),
             ) for l in node['inner'] if l['kind'] == 'ParmVarDecl']
-
     else:
-        raise NotImplementedError('Split type in way not anticipated!')
+        params = ()
 
     previously_declared = 'previousDecl' in node
     if previously_declared:
@@ -418,8 +430,8 @@ def cythonator(filename: str, clang_exe='clang++-10'):
             print(node['kind'])
 
     # print(global_namespace)
-    pxd = write_pxd(global_namespace, filename)
-    print(pxd)
+    # pxd = write_pxd(global_namespace, filename)
+    # print(pxd)
     # print(_get_all_types(global_namespace))
     return global_namespace
 

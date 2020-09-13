@@ -1,22 +1,26 @@
 '''Traverse the AST and prettyprint Cython.'''
 
 import pathlib
+from collections import namedtuple
 
 TAB = '    '
 
+Typedef = namedtuple('Typedef', 'id name type referenced')
+
 
 def _type_str(t):
-    s = t.name
-    if t.is_ref:
-        s += '&'
-    elif t.is_ptr:
-        if t.is_const_ptr:
-            s += ' *const'
-        else:
-            s += '*'
-    if t.is_const:
-        s = 'const ' + s
-    return s
+    # s = t.name
+    # if t.is_ref:
+    #     s += '&'*t.clang_str.count('&')
+    # elif t.is_ptr:
+    #     if t.is_const_ptr:
+    #         s += ' *const'
+    #     else:
+    #         s += '*'*t.clang_str.count('*')
+    # if t.is_const:
+    #     s = 'const ' + s
+    # return s
+    return t.clang_str.replace('<', '[').replace('>', ']').strip()
 
 
 def _arg_str(params):
@@ -31,14 +35,32 @@ def _arg_str(params):
 
 def _templ_str(params):
     # TODO: handle nested templates!
-    templs = ', '.join([p.name for p in params if p.referenced])
+    templs = ', '.join([p.name for p in params])
     if templs:
         return '[{templs}]'.format(templs=templs)
     return ''
 
 
 def _print_typedef(t, indent_lvl):
-    return TAB*indent_lvl + 'ctypedef {type} {alias}\n'.format(
+
+    # Cython can get confused with nested typedefs (especially with
+    # templates), so let's separate things out
+    td = ''
+    subs = {}
+    if t.type.template_args:
+        for ta in t.type.template_args:
+            if ta.template_args:
+                td += _print_typedef(Typedef(
+                    id=-1,
+                    name='_' + ta.name,
+                    type=ta,
+                    referenced=True
+                ), indent_lvl)
+                subs[ta.name] = '_' + ta.name
+
+    print(subs)
+    # TODO: use subs to replace nested templated parameters
+    return td + TAB*indent_lvl + 'ctypedef {type} {alias}\n'.format(
         type=_type_str(t.type),
         alias=t.name,
     )
@@ -78,7 +100,7 @@ def _print_method(m, indent_lvl):
 
 def _print_class(c, indent_lvl):
     pxd = ''
-    pxd += TAB*indent_lvl + 'cdef cppclass {name}{templates}:\n'.format(
+    pxd += TAB*indent_lvl + 'cppclass {name}{templates}:\n'.format(
         name=c.name,
         templates=_templ_str(c.templateparams),
     )

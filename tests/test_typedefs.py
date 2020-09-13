@@ -61,7 +61,9 @@ class TestTypedefs(unittest.TestCase):
             'template<class T, class U> class A {};',
             'template<class T, class U> class B {};',
             'typedef B<A<double *const, const long&>&, const int>& Tdbl;'
-        ]).children[2]
+            # 'typedef A<double *const, const long&>& t1;',
+            # 'typedef B<t1, const int>& Tdbl;',
+        ]).children[-1]
 
         # the main type
         self.assertEqual(td.type.name, 'B')
