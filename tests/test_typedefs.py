@@ -61,8 +61,6 @@ class TestTypedefs(unittest.TestCase):
             'template<class T, class U> class A {};',
             'template<class T, class U> class B {};',
             'typedef B<A<double *const, const long&>&, const int>& Tdbl;'
-            # 'typedef A<double *const, const long&>& t1;',
-            # 'typedef B<t1, const int>& Tdbl;',
         ]).children[-1]
 
         # the main type
@@ -94,3 +92,12 @@ class TestTypedefs(unittest.TestCase):
         self.assertTrue(td.type.template_args[1].is_const)
         self.assertFalse(td.type.template_args[1].is_ref)
         self.assertFalse(td.type.template_args[1].is_ptr)
+
+    def test_recursive_two_levels_templated(self):
+        td = _code_runner([
+            'template<class T, class U> class A {};',
+            'template<class T, class U> class B {};',
+            'template<class T, class U> class C {};',
+            'typedef B<A<double *const, C<int[], int**> >&, const int>& Tdbl;'
+        ]).children[-1]
+        # print(td)

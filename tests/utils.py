@@ -16,6 +16,7 @@ def _code_runner(code):
         ns = cythonator(filename=fp.name)
 
         pxd = write_pxd(ns, fp.name)
+        print(pxd)
         pyxfp.write(pxd.encode())
         pyxfp.flush()
 

@@ -202,7 +202,7 @@ class TestFunctionsWithArgs(unittest.TestCase):
         f = _code_run_single_fun([
             'int func(int*[1][1]);'
         ])
-        print(f)
+        # print(f)
 
 if __name__ == '__main__':
     unittest.main()

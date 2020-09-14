@@ -47,23 +47,23 @@ def _print_typedef(t, indent_lvl):
     # templates), so let's separate things out
     td = ''
     subs = {}
-    if t.type.template_args:
-        for ta in t.type.template_args:
-            if ta.template_args:
-                td += _print_typedef(Typedef(
-                    id=-1,
-                    name='_' + ta.name,
-                    type=ta,
-                    referenced=True
-                ), indent_lvl)
-                subs[ta.name] = '_' + ta.name
+    workaround_name = lambda name: '_cython_workaround_' + name
+    for ta in t.type.template_args:
+        if ta.template_args:
+            td += _print_typedef(Typedef(
+                id=-1,
+                name=workaround_name(ta.name),
+                type=ta,
+                referenced=True
+            ), indent_lvl)
+            subs[_type_str(ta)] = workaround_name(ta.name)
 
-    print(subs)
-    # TODO: use subs to replace nested templated parameters
-    return td + TAB*indent_lvl + 'ctypedef {type} {alias}\n'.format(
-        type=_type_str(t.type),
-        alias=t.name,
-    )
+    # Use subs to replace nested templated parameters
+    type_str = _type_str(t.type)
+    for s in subs:
+        type_str = type_str.replace(s, subs[s])
+
+    return td + TAB*indent_lvl + f'ctypedef {type_str} {t.name}\n'
 
 
 def _print_field(f, indent_lvl):

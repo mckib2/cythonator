@@ -101,7 +101,7 @@ def _get_template_args(type_str):
             recurse = True
         if template_str[idx] == '>':
             braces -= 1
-        if braces == 0 and template_str[idx] == ',' and recurse:
+        if braces == 0 and template_str[idx] == ',':
             # print('tipe before recurse is', tipe)
             # types.append(_get_template_args(tipe)[0])
             types.append(Type(
@@ -111,23 +111,11 @@ def _get_template_args(type_str):
                 is_const=_is_const(tipe),
                 is_const_ptr=_is_const_ptr(tipe),
                 is_arr=_is_arr(tipe),
-                template_args=_get_template_args(tipe),
+                template_args=_get_template_args(tipe) if recurse else [],
                 clang_str=tipe,
             ))
             tipe = ''
             recurse = False
-        elif braces == 0 and template_str[idx] == ',':
-            types.append(Type(
-                name=_sanitize_type_str(tipe),
-                is_ref=_is_ref(tipe),
-                is_ptr=_is_ptr(tipe),
-                is_const=_is_const(tipe),
-                is_const_ptr=_is_const_ptr(tipe),
-                is_arr=_is_arr(tipe),
-                template_args=[],  # did not recurse
-                clang_str=tipe,
-            ))
-            tipe = ''
         else:
             tipe = tipe + template_str[idx]
             if idx == len(template_str) - 1:
@@ -138,7 +126,7 @@ def _get_template_args(type_str):
                     is_const=_is_const(tipe),
                     is_const_ptr=_is_const_ptr(tipe),
                     is_arr=_is_arr(tipe),
-                    template_args=[],  # did not recurse
+                    template_args=_get_template_args(tipe) if recurse else [],
                     clang_str=tipe,
                 ))
 
