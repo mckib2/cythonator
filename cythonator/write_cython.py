@@ -47,16 +47,16 @@ def _print_typedef(t, indent_lvl):
     # templates), so let's separate things out
     td = ''
     subs = {}
-    workaround_name = lambda name: '_cython_workaround_' + name
+    workaround_prefix = '_cython_nested_templated_typedef_workaround_'
     for ta in t.type.template_args:
         if ta.template_args:
             td += _print_typedef(Typedef(
                 id=-1,
-                name=workaround_name(ta.name),
+                name=workaround_prefix + ta.name,
                 type=ta,
                 referenced=True
             ), indent_lvl)
-            subs[_type_str(ta)] = workaround_name(ta.name)
+            subs[_type_str(ta)] = workaround_prefix = ta.name
 
     # Use subs to replace nested templated parameters
     type_str = _type_str(t.type)
