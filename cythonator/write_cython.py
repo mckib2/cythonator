@@ -2,6 +2,7 @@
 
 import pathlib
 from collections import namedtuple
+from keyword import iskeyword
 
 TAB = '    '
 
@@ -23,19 +24,23 @@ def _type_str(t):
     return t.clang_str.replace('<', '[').replace('>', ']').strip()
 
 
+def _safe_name(name):
+    return name + '_'*iskeyword(name)
+
+
 def _arg_str(params):
     args = []
     for p in params:
         arg = _type_str(p.type)
         if p.name:
-            arg += ' ' + p.name
+            arg += ' ' + _safe_name(p.name)
         args.append(arg)
     return ', '.join(args)
 
 
 def _templ_str(params):
     # TODO: handle nested templates!
-    templs = ', '.join([p.name for p in params])
+    templs = ', '.join([_safe_name(p.name) for p in params])
     if templs:
         return '[{templs}]'.format(templs=templs)
     return ''
@@ -56,27 +61,27 @@ def _print_typedef(t, indent_lvl):
                 type=ta,
                 referenced=True
             ), indent_lvl)
-            subs[_type_str(ta)] = workaround_prefix = ta.name
+            subs[_type_str(ta)] = workaround_prefix + ta.name
 
     # Use subs to replace nested templated parameters
     type_str = _type_str(t.type)
     for s in subs:
         type_str = type_str.replace(s, subs[s])
 
-    return td + TAB*indent_lvl + f'ctypedef {type_str} {t.name}\n'
+    return td + TAB*indent_lvl + f'ctypedef {type_str} {_safe_name(t.name)}\n'
 
 
 def _print_field(f, indent_lvl):
     return TAB*indent_lvl + '{type} {name}\n'.format(
         type=_type_str(f.type),
-        name=f.name,
+        name=_safe_name(f.name),
     )
 
 
 def _print_function(f, indent_lvl):
     return TAB*indent_lvl + 'cdef {ret_type} {name}{templates}({args})\n'.format(
         ret_type=_type_str(f.return_type),
-        name=f.name,
+        name=_safe_name(f.name),
         templates=_templ_str(f.templateparams),
         args=_arg_str(f.params),
     )
@@ -86,13 +91,13 @@ def _print_method(m, indent_lvl):
     f = m.function
     if m.is_ctor:
         return TAB*indent_lvl + '{name}{templates}({args}) except +\n'.format(
-            name=f.name,
+            name=_safe_name(f.name),
             templates=_templ_str(f.templateparams),
             args=_arg_str(f.params),
         )
     return TAB*indent_lvl + '{ret_type} {name}{templates}({args})\n'.format(
         ret_type=_type_str(f.return_type),
-        name=f.name,
+        name=_safe_name(f.name),
         templates=_templ_str(f.templateparams),
         args=_arg_str(f.params),
     )
@@ -101,29 +106,21 @@ def _print_method(m, indent_lvl):
 def _print_class(c, indent_lvl):
     pxd = ''
     pxd += TAB*indent_lvl + 'cppclass {name}{templates}:\n'.format(
-        name=c.name,
+        name=_safe_name(c.name),
         templates=_templ_str(c.templateparams),
     )
 
     indent_lvl += 1
-    if c.typedefs:
-        pxd += TAB*indent_lvl + '# TYPEDEFS\n'
     for t in c.typedefs:
         pxd += _print_typedef(t, indent_lvl)
 
-    if c.fields:
-        pxd += TAB*indent_lvl + '# DATA MEMBERS\n'
     for f in c.fields:
         pxd += _print_field(f, indent_lvl)
 
-    if c.methods:
-        pxd += TAB*indent_lvl + '# METHODS\n'
     for m in c.methods:
         pxd += _print_method(m, indent_lvl)
 
     # Recursively handle children
-    if c.children:
-        pxd += TAB*indent_lvl + '# CHILDREN\n'
     for ic in c.children:
         if ic.__class__.__name__ == 'Class':
             pxd += _print_class(ic, indent_lvl)

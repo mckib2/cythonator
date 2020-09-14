@@ -163,6 +163,12 @@ def handle_typedef(node):
 
 def handle_function(node):
     templateparams = ()
+
+    # strip templates off of constructors;
+    # this seems to be the only function kind that needs this
+    if node['kind'] == 'CXXConstructorDecl':
+        node['name'] = node['name'].split('<')[0]
+
     if node['kind'] == 'FunctionTemplateDecl':
         # handle TemplateParams here
         # TODO: doesn't handle nested templates yet
@@ -178,7 +184,7 @@ def handle_function(node):
         nonTypeTemplateParams = [
             t['type']['qualType'] + ' ' + t['name']
             for t in node['inner']
-            if t['kind'] == 'NonTypeTemplateParmDecl']
+            if t['kind'] == 'NonTypeTemplateParmDecl' and 'name' in t]
         if nonTypeTemplateParams:
             warn(
                 f'Non-type template parameters {set(nonTypeTemplateParams)} of'
@@ -208,9 +214,9 @@ def handle_function(node):
         params = ()
 
     previously_declared = 'previousDecl' in node
-    if previously_declared:
-        raise NotImplementedError('Need naming scheme for overloads '
-                                  'and template specializations!')
+    # if previously_declared:
+    #     raise NotImplementedError('Need naming scheme for overloads '
+    #                               'and template specializations!')
 
     return Function(
         id=node['id'],
@@ -264,6 +270,11 @@ def handle_class(node):
     # if node['name'] == 'MyStructI':
     #     print(json.dumps(node, indent=4))
 
+    # If the class has no name, we probably don't care?
+    if 'name' not in node:
+        print(json.dumps(node, indent=4))
+        assert False
+
     # Keep a list of all the base classes we inherit from;
     # We currently don't keep track of access (public, private, etc.),
     # but that information is available here
@@ -291,7 +302,7 @@ def handle_class(node):
         nonTypeTemplateParams = [
             t['type']['qualType'] + ' ' + t['name']
             for t in node['inner']
-            if t['kind'] == 'NonTypeTemplateParmDecl']
+            if t['kind'] == 'NonTypeTemplateParmDecl' and 'name' in t]
 
         templateTemplateParams = [
             t['name'] for t in node['inner'] if t['kind'] =='TemplateTemplateParmDecl'
@@ -337,7 +348,7 @@ def handle_class(node):
     # gather up all children
     children = []
     for thing in node['inner']:
-        if thing['kind'] in {'CXXRecordDecl', 'ClassTemplateDecl'} and thing['name'] != node['name']:
+        if thing['kind'] in {'CXXRecordDecl', 'ClassTemplateDecl'} and (('name' in thing) and (thing['name'] != node['name'])):
             children.append(handle_class(thing))
 
     return Class(
@@ -376,12 +387,18 @@ def _get_all_types(thing):
     return types
 
 
-def cythonator(filename: str, clang_exe='clang++-10'):
+def cythonator(filename: str, extra_include_dirs=None, clang_exe='clang++-10'):
     '''C/C++ -> Cython.'''
 
     # Process the sources
+    opts = []
+    if extra_include_dirs is not None:
+        opts.append('-I')
+        opts.append(extra_include_dirs)
+
+    opts.append(filename)
     proc = subprocess.Popen(
-        [clang_exe, '-Xclang', '-ast-dump=json', '-fsyntax-only'] + [filename],
+        [clang_exe, '-Xclang', '-ast-dump=json', '-fsyntax-only'] + opts,
         stdout=subprocess.PIPE)
     out, _err = proc.communicate()
 
@@ -428,14 +445,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='C++ -> Cython.')
     parser.add_argument(
         '--header', type=str, help='C++ header file', required=True)
+    parser.add_argument(
+        '--output', type=str, help='PYX file to write', required=True)
+    parser.add_argument(
+        '-I', type=str, help='Include directory', required=False)
     args = parser.parse_args()
 
-    # infiles = [
-    #     # 'tests/void_function_no_args.hpp',
-    #     # 'tests/typed_function_no_args.hpp',
-    #     # 'tests/headers/functions.hpp',
-    #     'tests/headers/simple.hpp',
-    # ]
-    # cythonator([str(pathlib.Path(f).resolve()) for f in infiles])
-
-    cythonator(args.header)
+    # write to file
+    ns = cythonator(args.header, extra_include_dirs=args.I)
+    with open(args.output, 'wb') as fp:
+        fp.write(write_pxd(ns, args.header).encode())

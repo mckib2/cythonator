@@ -13,7 +13,7 @@ namespace one {
       int * myTrickyFunction(double constArg, int argConst) {}
     private:
       int myprop;
-      int* myprop;
+      int* myprop_star;
     };
 
   }
