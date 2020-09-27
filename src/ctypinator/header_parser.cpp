@@ -38,22 +38,23 @@ public:
   }
 
   void HandleStruct(CXXRecordDecl *Declaration, const std::string & name) {
-    global_decls << "class " << name << "(ctypes.Structure):" << "\n";
+    forward_decls << "class " << name << "(ctypes.Structure):" << "\n"
+                  << "    pass" << "\n";
+
     if (Declaration->field_empty()) {
-      global_decls << "        pass\n";
+      global_decls << name << "._fields_ = []\n\n";
     }
     else {
-      global_decls << "    __fields__ = [" << "\n";
+      global_decls << name << "._fields_ = [" << "\n";
       for (const auto & f : Declaration->fields()) {
-        global_decls << "        ('" << f->getNameAsString() << "', " << typemap(f->getType()) << " " << "),\n";
+        global_decls << "    ('" << f->getNameAsString() << "', " << typemap(f->getType()) << " " << "),\n";
       }
-      global_decls << "    ]\n\n";
+      global_decls << "]\n\n";
     }
   }
 
   bool VisitTypedefNameDecl(TypedefNameDecl *Declaration) {
     if (auto a = llvm::dyn_cast<clang::ElaboratedType>(Declaration->getUnderlyingType())) {
-      a->getNamedType().dump();
       if (a->isStructureType()) {
         if (auto d = llvm::dyn_cast_or_null<clang::CXXRecordDecl>(a->getAsStructureType()->getDecl())) {
           if (d->getNameAsString() != "") {
@@ -62,7 +63,6 @@ public:
           else {
             HandleStruct(d, a->getNamedType().getAsString());
           }
-
         }
       }
     }
@@ -79,11 +79,13 @@ public:
     }
 
     llvm::outs() << "\n"
+                 << forward_decls.str()
+                 << "\n"
                  << global_decls.str();
 
     llvm::outs() << "\n"
                  << "class Wrapper:" << "\n"
-                 << "    def __init__(self, lib_path)" << "\n"
+                 << "    def __init__(self, lib_path):" << "\n"
                  << "        # Load the shared library" << "\n"
                  << "        _lib = ctypes.cdll.LoadLibrary(lib_path)" << "\n"
                  << "\n"
@@ -94,6 +96,7 @@ protected:
   const std::string typemap(const clang::QualType & t) {
     std::ostringstream rtype;
     bool is_ptr = t.getTypePtr()->isAnyPointerType();
+    bool is_ptr_ptr = is_ptr && t.getTypePtr()->getPointeeType().getDesugaredType(*Context).getTypePtr()->isAnyPointerType();
     bool is_func_ptr = t.getTypePtr()->isFunctionPointerType();
     bool is_arr = t.getTypePtr()->isArrayType();
     bool is_const_arr = is_arr && llvm::dyn_cast_or_null<clang::ConstantArrayType>(t.getTypePtr());
@@ -131,12 +134,15 @@ protected:
     const std::string & cmp_t = is_ptr
       ? (is_func_ptr
          ? llvm::dyn_cast_or_null<clang::FunctionType>(t.getTypePtr()->getPointeeType().getDesugaredType(*Context).getTypePtr())->getReturnType().getAsString()
-         : t.getTypePtr()->getPointeeType().getAsString())
+         : (is_ptr_ptr
+            ? typemap(t.getTypePtr()->getPointeeType().getUnqualifiedType())
+            : t.getTypePtr()->getPointeeType().getUnqualifiedType().getAsString()))
       : (is_const_arr
          ? llvm::dyn_cast_or_null<clang::ConstantArrayType>(t.getTypePtr())->getElementType().getUnqualifiedType().getAsString()
          : (is_incomplete_arr
             ? llvm::dyn_cast_or_null<clang::IncompleteArrayType>(t.getTypePtr())->getElementType().getUnqualifiedType().getAsString()
-            : t.getAsString()));
+            : t.getUnqualifiedType().getAsString()));
+
     if (cmp_t == "void") {
       rtype << "None";
     }
@@ -146,32 +152,44 @@ protected:
     else if (cmp_t == "double") {
       rtype << "ctypes.c_double";
     }
-    else if (cmp_t == "const char *") {
+    else if (cmp_t == "const char *" || cmp_t == "char *") {
       rtype << "ctypes.c_char_p";
-    }
-    else if (cmp_t == "char *") {
-      rtype << "ctypes.char_p";
     }
     else if (cmp_t == "void *") {
       rtype << "ctypes.c_void_p";
     }
+    else if (cmp_t == "size_t") {
+      rtype << "ctypes.c_size_t";
+    }
+    else if (cmp_t == "long long") {
+      rtype << "ctypes.c_longlong";
+    }
+    else if (cmp_t == "long double") {
+      rtype << "ctypes.c_longdouble";
+    }
+    else if (cmp_t == "va_list") {
+      // TODO: this may not work in all cases
+      rtype << "ctypes.c_void_p";
+    }
     else {
-      rtype << cmp_t;
+      // hacky workaround for typedef'd structs
+      if (cmp_t.rfind("struct ", 0) == 0) {
+        rtype << cmp_t.substr(7);
+      }
+      else {
+        rtype << cmp_t;
+      }
     }
 
     // TODO: handle arguments
-    // if (is_func_ptr) {
-      // const llvm::FunctionType* func = cast<const llvm::FunctionType*>(t.getTypePtr()->getPointeeType().getDesugaredType(*Context).getTypePtr());
-
-      // if (auto func = llvm::dyn_cast_or_null<llvm::FunctionType>(t.getTypePtr()->getPointeeType().getDesugaredType(*Context).getTypePtr())) {
-        // if (!func->isVarArg()) {
-        //   for (const auto & p : func->params()) {
-        //     rtype << p->getStructName() << ", ";
-        //   }
-        // }
+    if (is_func_ptr) {
+      if(auto func = llvm::dyn_cast_or_null<clang::FunctionProtoType>(t.getTypePtr()->getPointeeType().getDesugaredType(*Context).getTypePtr())) {
+        for(const auto & p : func->getParamTypes()) {
+          rtype << ", " << typemap(p);
+        }
         // TODO: support varargs?
-      // }
-    // }
+      }
+    }
 
     if (auto a = llvm::dyn_cast_or_null<clang::ConstantArrayType>(t.getTypePtr())) {
       rtype << "*" << a->getSize().toString(/*radix=*/10, /*signed=*/false);
@@ -189,6 +207,7 @@ protected:
 private:
   ASTContext *Context;
   std::ostringstream ss;
+  std::ostringstream forward_decls;
   std::ostringstream global_decls;
   bool used_ndpointer;
 };
